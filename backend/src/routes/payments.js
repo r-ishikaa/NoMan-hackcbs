@@ -12,39 +12,47 @@ const router = express.Router();
 
 // GET /payments/public-key - Get Stripe public key
 router.get("/public-key", (req, res) => {
-  const publicKey = process.env.STRIPE_PUBLIC_KEY || 
-                    process.env.STRIPE_TEST_PUBLIC_KEY;
-  
+  const publicKey =
+    process.env.STRIPE_PUBLIC_KEY || process.env.STRIPE_TEST_PUBLIC_KEY;
+
   if (!publicKey) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: "Stripe public key not configured",
-      message: "Please set STRIPE_PUBLIC_KEY or STRIPE_TEST_PUBLIC_KEY in your .env file"
+      message:
+        "Please set STRIPE_PUBLIC_KEY or STRIPE_TEST_PUBLIC_KEY in your .env file",
     });
   }
-  
+
   res.json({ publicKey });
 });
 
 // Initialize Stripe - check both possible env variable names
-const stripeKey = process.env.STRIPE_SECRET_KEY || 
-                  process.env.STRIPE_TEST_SECRET_KEY ||
-                  process.env.STRIPE_SECRET_KEY_TEST;
+const stripeKey =
+  process.env.STRIPE_SECRET_KEY ||
+  process.env.STRIPE_TEST_SECRET_KEY ||
+  process.env.STRIPE_SECRET_KEY_TEST;
 
 if (!stripeKey) {
-  console.warn("⚠️  Stripe secret key not found. Payment functionality will not work.");
-  console.warn("   Please set STRIPE_SECRET_KEY or STRIPE_TEST_SECRET_KEY in your .env file");
+  console.warn(
+    "⚠️  Stripe secret key not found. Payment functionality will not work."
+  );
+  console.warn(
+    "   Please set STRIPE_SECRET_KEY or STRIPE_TEST_SECRET_KEY in your .env file"
+  );
 }
 
-const stripe = stripeKey ? new Stripe(stripeKey, {
-  apiVersion: "2024-12-18.acacia",
-}) : null;
+const stripe = stripeKey
+  ? new Stripe(stripeKey, {
+      apiVersion: "2024-12-18.acacia",
+    })
+  : null;
 
 // POST /payments/create-intent - Create a payment intent for funding a post
 router.post("/create-intent", authenticateToken, async (req, res) => {
   if (!stripe) {
     return res.status(500).json({ error: "Stripe is not configured" });
   }
-  
+
   try {
     const { postId, amount, message } = req.body;
     const donorId = String(req.user._id);
@@ -94,7 +102,9 @@ router.post("/create-intent", authenticateToken, async (req, res) => {
         recipientId,
         message: message || "",
       },
-      description: `Funding for post by ${recipient.username || recipient.email}`,
+      description: `Funding for post by ${
+        recipient.username || recipient.email
+      }`,
     });
 
     // Create payment record
@@ -124,7 +134,7 @@ router.post("/confirm", authenticateToken, async (req, res) => {
   if (!stripe) {
     return res.status(500).json({ error: "Stripe is not configured" });
   }
-  
+
   try {
     const { paymentIntentId } = req.body;
 
@@ -160,15 +170,18 @@ router.post("/confirm", authenticateToken, async (req, res) => {
 
       // Send notification to post author about funding
       try {
-        const Notification = (await import("../models/Notification.js")).default;
+        const Notification = (await import("../models/Notification.js"))
+          .default;
         const User = (await import("../models/User.js")).default;
-        const { broadcastNotification } = await import("../utils/notificationBroadcaster.js");
+        const { broadcastNotification } = await import(
+          "../utils/notificationBroadcaster.js"
+        );
         const { sendPushNotification } = await import("./push.js");
-        
+
         const donor = await User.findById(payment.donorId).select("username");
         const donorUsername = donor?.username || "Someone";
         const amount = (payment.amount / 100).toFixed(2);
-        
+
         const notification = await Notification.create({
           recipientId: payment.recipientId,
           type: "fund",
@@ -178,10 +191,13 @@ router.post("/confirm", authenticateToken, async (req, res) => {
           relatedPostId: payment.postId,
           relatedReelId: "",
         });
-        
+
         // Send via WebSocket
-        broadcastNotification(payment.recipientId, notification.toObject ? notification.toObject() : notification);
-        
+        broadcastNotification(
+          payment.recipientId,
+          notification.toObject ? notification.toObject() : notification
+        );
+
         // Send web push notification
         sendPushNotification(payment.recipientId, {
           title: "New Funding",
@@ -227,7 +243,9 @@ router.get("/post/:postId", async (req, res) => {
   try {
     const { postId } = req.params;
 
-    const post = await Post.findById(postId).select("fundingTotal fundingCount");
+    const post = await Post.findById(postId).select(
+      "fundingTotal fundingCount"
+    );
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
@@ -362,73 +380,76 @@ router.get("/my-earnings", authenticateToken, async (req, res) => {
 });
 
 // Webhook endpoint for Stripe (to handle payment confirmations)
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  if (!stripe) {
-    return res.status(500).send("Stripe is not configured");
-  }
-  
-  const sig = req.headers["stripe-signature"];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  let event;
-
-  try {
-    if (!webhookSecret) {
-      console.warn("Stripe webhook secret not configured");
-      return res.status(400).send("Webhook secret not configured");
+router.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    if (!stripe) {
+      return res.status(500).send("Stripe is not configured");
     }
 
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  // Handle the event
-  if (event.type === "payment_intent.succeeded") {
-    const paymentIntent = event.data.object;
+    let event;
 
     try {
-      const payment = await Payment.findOne({
-        stripePaymentIntentId: paymentIntent.id,
-      });
+      if (!webhookSecret) {
+        console.warn("Stripe webhook secret not configured");
+        return res.status(400).send("Webhook secret not configured");
+      }
 
-      if (payment && payment.status === "pending") {
-        payment.status = "succeeded";
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err) {
+      console.error("Webhook signature verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
-        // Update post funding totals
-        await Post.findByIdAndUpdate(payment.postId, {
-          $inc: {
-            fundingTotal: payment.amount,
-            fundingCount: 1,
-          },
+    // Handle the event
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object;
+
+      try {
+        const payment = await Payment.findOne({
+          stripePaymentIntentId: paymentIntent.id,
         });
 
-        await payment.save();
-        console.log(`Payment confirmed: ${payment._id}`);
-      }
-    } catch (error) {
-      console.error("Error processing webhook:", error);
-    }
-  } else if (event.type === "payment_intent.payment_failed") {
-    const paymentIntent = event.data.object;
+        if (payment && payment.status === "pending") {
+          payment.status = "succeeded";
 
-    try {
-      const payment = await Payment.findOne({
-        stripePaymentIntentId: paymentIntent.id,
-      });
+          // Update post funding totals
+          await Post.findByIdAndUpdate(payment.postId, {
+            $inc: {
+              fundingTotal: payment.amount,
+              fundingCount: 1,
+            },
+          });
 
-      if (payment) {
-        payment.status = "failed";
-        await payment.save();
+          await payment.save();
+          console.log(`Payment confirmed: ${payment._id}`);
+        }
+      } catch (error) {
+        console.error("Error processing webhook:", error);
       }
-    } catch (error) {
-      console.error("Error processing failed payment:", error);
+    } else if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object;
+
+      try {
+        const payment = await Payment.findOne({
+          stripePaymentIntentId: paymentIntent.id,
+        });
+
+        if (payment) {
+          payment.status = "failed";
+          await payment.save();
+        }
+      } catch (error) {
+        console.error("Error processing failed payment:", error);
+      }
     }
+
+    res.json({ received: true });
   }
-
-  res.json({ received: true });
-});
+);
 
 export default router;
-

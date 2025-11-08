@@ -14,6 +14,7 @@ import ReelComposer from '../ReelComposer'
 import RoleSwitcher from '../RoleSwitcher'
 import { communityData } from '../../data/CommunityData'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 
 function authHeaders() {
   const token =
@@ -24,6 +25,7 @@ function authHeaders() {
 }
 
 const Profile = () => {
+  const { role } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [meId, setMeId] = useState(null)
@@ -365,6 +367,14 @@ const Profile = () => {
                         >
                           Edit Profile
                         </Link>
+                        {(role === 'creator' || role === 'enterprise') && (
+                          <Link 
+                            to="/activity" 
+                            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-all shadow-lg hover:shadow-xl"
+                          >
+                            Activity
+                          </Link>
+                        )}
                         <Link 
                           to="/dashboard" 
                           className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white font-semibold hover:bg-zinc-800 transition-all shadow-lg hover:shadow-xl"
