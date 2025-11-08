@@ -5,32 +5,17 @@ const ReelCard = ({ reel, hovered, setHovered, index, onOpen }) => {
   const timerRef = useRef(null)
 
   const scenes = Array.isArray(reel?.scenes) ? reel.scenes : []
-  const hasVideo = !!reel?.videoUrl
-  const isAIReel = scenes.length > 0 && !hasVideo
-  // Use first scene image for AI reels, or video thumbnail for uploaded videos
-  const cover = scenes[0]?.imageUrl || null
+  const cover = scenes[0]?.imageUrl || 'https://placehold.co/800x1400/111/EEE?text=Reel'
 
   useEffect(() => {
-    // Only auto-advance scenes for AI reels with multiple scenes
-    if (!isAIReel || scenes.length <= 1) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      return
-    }
+    if (scenes.length <= 1) return
     timerRef.current = setInterval(() => {
       setActive((a) => (a + 1) % scenes.length)
     }, 2000)
-    return () => { 
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-    }
-  }, [scenes.length, isAIReel])
+    return () => { clearInterval(timerRef.current) }
+  }, [scenes.length])
 
-  const current = isAIReel ? (scenes[active]?.imageUrl || cover) : cover
+  const current = scenes[active]?.imageUrl || cover
 
   return (
     <div
@@ -42,58 +27,12 @@ const ReelCard = ({ reel, hovered, setHovered, index, onOpen }) => {
       style={{ height: '600px', width: '384px', minWidth: '384px', cursor: 'pointer' }}
       onClick={() => onOpen && onOpen(reel)}
     >
-      {hasVideo ? (
-        // Uploaded video - show video element
-        <video
-          src={reel.videoUrl}
-          className="object-cover absolute inset-0 w-full h-full"
-          muted
-          playsInline
-          onMouseEnter={(e) => {
-            e.target.currentTime = 0
-            e.target.play().catch(() => {})
-          }}
-          onMouseLeave={(e) => {
-            e.target.pause()
-            e.target.currentTime = 0
-          }}
-        />
-      ) : current ? (
-        // AI reel with image
-        <img 
-          src={current} 
-          alt={reel.title || 'Reel'} 
-          className="object-cover absolute inset-0 w-full h-full"
-          onError={(e) => {
-            // Hide image on error, show fallback
-            e.target.style.display = 'none'
-          }}
-        />
-      ) : (
-        // Fallback placeholder
-        <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center text-white">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-2 bg-zinc-700/50 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            </div>
-            <p className="text-sm text-zinc-400">Reel</p>
-          </div>
-        </div>
-      )}
+      <img src={current} alt={reel.title} className="object-cover absolute inset-0 w-full h-full" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-        <p className="text-sm font-medium text-white/70 mb-2">
-          {isAIReel ? 'AI Reel' : 'Uploaded Reel'}
-        </p>
-        <p className="text-xl font-bold mb-2 line-clamp-2">{reel.title || 'Untitled Reel'}</p>
-        <p className="text-xs text-white/80">
-          {isAIReel 
-            ? `${scenes.length} scenes • ${reel.totalDuration || 0}s`
-            : `${reel.duration || 0}s`
-          }
-        </p>
+        <p className="text-sm font-medium text-white/70 mb-2">AI Reel</p>
+        <p className="text-xl font-bold mb-2 line-clamp-2">{reel.title}</p>
+        <p className="text-xs text-white/80">{scenes.length} scenes • {reel.totalDuration || 0}s</p>
       </div>
     </div>
   )
