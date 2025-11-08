@@ -160,10 +160,10 @@ const CommunitiesPage = () => {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white flex flex-col items-center">
         {/* Header Section */}
-        <div className="bg-white pt-28 pb-16 px-8">
-          <div className="max-w-7xl mx-auto">
+        <div className="w-full bg-white pt-28 pb-16 px-8 flex justify-center">
+          <div className="max-w-7xl w-full">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-6">
               <div>
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-black mb-6 uppercase">
@@ -188,8 +188,8 @@ const CommunitiesPage = () => {
         </div>
 
       {/* Search Section */}
-      <div className="bg-gray-50 py-8 px-8 border-t border-b border-gray-200">
-        <div className="max-w-7xl mx-auto">
+      <div className="w-full bg-gray-50 py-8 px-8 border-t border-b border-gray-200 flex justify-center">
+        <div className="max-w-7xl w-full">
           <div className="relative max-w-2xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -211,8 +211,8 @@ const CommunitiesPage = () => {
       </div>
 
       {/* Cards Grid Section */}
-      <div className="py-20 px-10 bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="max-w-6xl mx-auto">
+      <div className="w-full py-20 px-10 bg-gradient-to-br from-purple-50 to-pink-50 flex justify-center">
+        <div className="max-w-6xl w-full">
           {filteredCommunities.length > 0 ? (
             <div
               className="
@@ -263,7 +263,7 @@ const CommunitiesPage = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-center items-center gap-4 py-12 bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="w-full flex justify-center items-center gap-4 py-12 bg-gradient-to-br from-purple-50 to-pink-50">
         {[1, 2, 3, 4].map((num) => (
           <button
             key={num}

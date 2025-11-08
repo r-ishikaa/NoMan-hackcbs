@@ -12,6 +12,8 @@ import PostCard from '../PostCard'
 import PostComposer from '../PostComposer'
 import ReelComposer from '../ReelComposer'
 import RoleSwitcher from '../RoleSwitcher'
+import CollaborationModal from '../CollaborationModal'
+import WalletConnect from '../WalletConnect'
 import { communityData } from '../../data/CommunityData'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -41,6 +43,9 @@ const Profile = () => {
   const [playerOpen, setPlayerOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [sceneIdx, setSceneIdx] = useState(0)
+  const [collabModalOpen, setCollabModalOpen] = useState(false)
+  const [walletModalOpen, setWalletModalOpen] = useState(false)
+  const [connectedWallet, setConnectedWallet] = useState(null)
   const sceneTimerRef = useRef(null)
   const videoRef = useRef(null)
   
@@ -367,6 +372,18 @@ const Profile = () => {
                         >
                           Edit Profile
                         </Link>
+                        
+                        {/* Wallet Connection Button - For all users */}
+                        <button
+                          onClick={() => setWalletModalOpen(true)}
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold hover:from-orange-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                          </svg>
+                          {connectedWallet ? 'Wallet Connected' : 'Connect Wallet'}
+                        </button>
+                        
                         {(role === 'creator' || role === 'enterprise') && (
                           <Link 
                             to="/activity" 
@@ -383,6 +400,7 @@ const Profile = () => {
                         </Link>
                       </>
                     ) : (
+                      <>
                       <button
                         onClick={async () => {
                           try {
@@ -407,7 +425,21 @@ const Profile = () => {
                         }`}
                       >
                         {isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                        
+                        {/* Collaboration Button - Show only for creators/enterprises */}
+                        {(profile.role === 'creator' || profile.role === 'enterprise') && (
+                          <button
+                            onClick={() => setCollabModalOpen(true)}
+                            className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Collaborate
                       </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -980,6 +1012,43 @@ const Profile = () => {
                   {selectedReel.likeCount ? <span>❤️ {selectedReel.likeCount}</span> : null}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Collaboration Modal */}
+      <CollaborationModal
+        isOpen={collabModalOpen}
+        onClose={() => setCollabModalOpen(false)}
+        creatorProfile={profile}
+      />
+
+      {/* Wallet Connection Modal */}
+      {walletModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Connect Wallet</h2>
+              <button
+                onClick={() => setWalletModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <WalletConnect
+                onWalletConnected={(wallet) => {
+                  setConnectedWallet(wallet);
+                  if (wallet) {
+                    setTimeout(() => setWalletModalOpen(false), 1500);
+                  }
+                }}
+                currentWallet={connectedWallet}
+              />
             </div>
           </div>
         </div>

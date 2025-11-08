@@ -41,88 +41,6 @@ const AdvancedDashboard = () => {
   const [topPosts, setTopPosts] = useState([]);
   const [topReels, setTopReels] = useState([]);
   const [error, setError] = useState(null);
-  const [collaborationRate, setCollaborationRate] = useState(null);
-
-  // Calculate dynamic collaboration rate based on analytics
-  const calculateCollaborationRate = (analyticsData) => {
-    if (!analyticsData || !analyticsData.overview) return null;
-
-    const {
-      totalPosts = 0,
-      totalReels = 0,
-      totalViews = 0,
-      totalLikes = 0,
-      totalComments = 0,
-      totalFollowers = 0,
-    } = analyticsData.overview;
-
-    // Base rate calculation factors
-    const BASE_RATE = 50; // Minimum rate in USD
-    const FOLLOWER_MULTIPLIER = 0.05; // $0.05 per follower
-    const ENGAGEMENT_MULTIPLIER = 0.02; // $0.02 per engagement (like/comment)
-    const VIEW_MULTIPLIER = 0.001; // $0.001 per view
-    const CONTENT_QUALITY_BONUS = 100; // Bonus for consistent content creation
-
-    // Calculate engagement rate
-    const totalEngagements = totalLikes + totalComments;
-    const engagementRate = totalFollowers > 0 ? (totalEngagements / totalFollowers) * 100 : 0;
-
-    // Calculate content consistency score (posts + reels in last 30 days)
-    const totalContent = totalPosts + totalReels;
-    const contentScore = Math.min(totalContent / 10, 1); // Max score at 10+ content pieces
-
-    // Calculate rate components
-    const followerValue = totalFollowers * FOLLOWER_MULTIPLIER;
-    const engagementValue = totalEngagements * ENGAGEMENT_MULTIPLIER;
-    const viewValue = totalViews * VIEW_MULTIPLIER;
-    const contentBonus = contentScore * CONTENT_QUALITY_BONUS;
-
-    // Engagement rate multiplier (higher engagement = higher rate)
-    let engagementMultiplier = 1;
-    if (engagementRate > 10) engagementMultiplier = 1.5;
-    else if (engagementRate > 5) engagementMultiplier = 1.3;
-    else if (engagementRate > 3) engagementMultiplier = 1.15;
-
-    // Calculate final rate
-    const calculatedRate = (
-      BASE_RATE +
-      followerValue +
-      engagementValue +
-      viewValue +
-      contentBonus
-    ) * engagementMultiplier;
-
-    // Determine tier based on rate
-    let tier = 'Emerging';
-    let tierColor = 'text-blue-600';
-    if (calculatedRate >= 5000) {
-      tier = 'Elite';
-      tierColor = 'text-purple-600';
-    } else if (calculatedRate >= 2000) {
-      tier = 'Professional';
-      tierColor = 'text-green-600';
-    } else if (calculatedRate >= 500) {
-      tier = 'Rising Star';
-      tierColor = 'text-yellow-600';
-    }
-
-    return {
-      rate: Math.round(calculatedRate),
-      minRate: Math.round(calculatedRate * 0.8), // 20% below
-      maxRate: Math.round(calculatedRate * 1.3), // 30% above
-      tier,
-      tierColor,
-      engagementRate: engagementRate.toFixed(2),
-      breakdown: {
-        base: BASE_RATE,
-        followers: Math.round(followerValue),
-        engagement: Math.round(engagementValue),
-        views: Math.round(viewValue),
-        contentBonus: Math.round(contentBonus),
-        multiplier: engagementMultiplier.toFixed(2),
-      },
-    };
-  };
 
   useEffect(() => {
     if (token) {
@@ -168,10 +86,6 @@ const AdvancedDashboard = () => {
       setActivityData(activityData);
       setTopPosts(postsData.posts || []);
       setTopReels(reelsData.reels || []);
-
-      // Calculate collaboration rate
-      const rate = calculateCollaborationRate(overviewData);
-      setCollaborationRate(rate);
     } catch (err) {
       console.error('Analytics fetch error:', err);
       setError(err.message);
@@ -305,7 +219,7 @@ const AdvancedDashboard = () => {
                     {d}D
             </button>
           ))}
-        </div>
+              </div>
               <div className="w-10 h-10 rounded-full bg-black/10 border border-black/20 flex items-center justify-center">
                 <span className="text-sm font-medium">JD</span>
               </div>
@@ -315,91 +229,6 @@ const AdvancedDashboard = () => {
       </header>
 
       <div className="w-full max-w-[1400px] mx-auto px-6 py-8">
-        {/* Collaboration Rate Card */}
-        {collaborationRate && (
-          <div className="mb-8 bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 border-2 border-purple-200 rounded-3xl p-8 shadow-xl">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Brand Collaboration Rate</h2>
-                <p className="text-gray-600">Your estimated value for brand partnerships</p>
-              </div>
-              <div className={`px-4 py-2 rounded-full bg-white border-2 border-purple-200 ${collaborationRate.tierColor} font-bold text-sm`}>
-                {collaborationRate.tier}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <p className="text-gray-500 text-sm mb-2">Minimum Rate</p>
-                <p className="text-3xl font-bold text-gray-900">${collaborationRate.minRate.toLocaleString()}</p>
-                <p className="text-xs text-gray-400 mt-1">Per collaboration</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-6 shadow-lg transform scale-105">
-                <p className="text-white/80 text-sm mb-2">Recommended Rate</p>
-                <p className="text-4xl font-bold text-white">${collaborationRate.rate.toLocaleString()}</p>
-                <p className="text-xs text-white/70 mt-1">Your sweet spot</p>
-              </div>
-              
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <p className="text-gray-500 text-sm mb-2">Maximum Rate</p>
-                <p className="text-3xl font-bold text-gray-900">${collaborationRate.maxRate.toLocaleString()}</p>
-                <p className="text-xs text-gray-400 mt-1">Premium brands</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Rate Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Base Rate</span>
-                  <span className="font-semibold text-gray-900">${collaborationRate.breakdown.base}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Followers</span>
-                  <span className="font-semibold text-blue-900">${collaborationRate.breakdown.followers.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Engagement</span>
-                  <span className="font-semibold text-green-900">${collaborationRate.breakdown.engagement.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Views</span>
-                  <span className="font-semibold text-purple-900">${collaborationRate.breakdown.views.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Content Bonus</span>
-                  <span className="font-semibold text-yellow-900">${collaborationRate.breakdown.contentBonus.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-pink-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Multiplier</span>
-                  <span className="font-semibold text-pink-900">{collaborationRate.breakdown.multiplier}x</span>
-                </div>
-              </div>
-              
-              <div className="mt-4 p-4 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Engagement Rate</span>
-                  <span className="text-lg font-bold text-purple-900">{collaborationRate.engagementRate}%</span>
-                </div>
-                <div className="mt-2 w-full bg-white rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(parseFloat(collaborationRate.engagementRate) * 10, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-900">
-                  <strong>💡 Pro Tip:</strong> Your rate increases with consistent posting, higher engagement, and growing follower base. 
-                  Maintain quality content to reach the next tier!
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {stats.map((stat, index) => {

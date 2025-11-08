@@ -65,7 +65,12 @@ const authenticateSocket = async (socket, next) => {
 
 // Setup notifications socket namespace
 export const setupNotificationsSocket = (io) => {
+  console.log("[Notifications Socket] Setting up /notifications namespace...");
   const notificationsNamespace = io.of("/notifications");
+  console.log(
+    "[Notifications Socket] Namespace created:",
+    notificationsNamespace.name
+  );
 
   // Apply authentication middleware
   notificationsNamespace.use(authenticateSocket);
@@ -115,12 +120,19 @@ export const setupNotificationsSocket = (io) => {
     });
   });
 
+  console.log("[Notifications Socket] ✅ Namespace setup complete");
+
   // Return function to send notification to a user
   return {
     sendNotification: (userId, notification) => {
       const socket = connectedUsers.get(String(userId));
       if (socket) {
         socket.emit("newNotification", notification);
+        console.log(
+          `[Notifications Socket] Sent notification to user ${userId}`
+        );
+      } else {
+        console.log(`[Notifications Socket] User ${userId} not connected`);
       }
     },
   };

@@ -399,7 +399,7 @@ const CommunityDetail = () => {
     return (
       <>
         <Navbar />
-        <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50">
+        <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 pt-20">
           <p className="text-lg text-gray-500">Loading community...</p>
         </div>
       </>
@@ -410,7 +410,7 @@ const CommunityDetail = () => {
     return (
       <>
         <Navbar />
-      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50">
+      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 pt-20">
         <h2 className="text-2xl font-bold mb-2">Community Not Found</h2>
         <Link to="/communities" className="text-purple-600 underline">
           ← Back to Communities
@@ -426,10 +426,10 @@ const CommunityDetail = () => {
     <>
       <Navbar />
       <div
-        className={`min-h-screen ${community?.bgColor || "bg-purple-300"} transition-all duration-700 pt-28 px-8`}
+        className={`min-h-screen ${community?.bgColor || "bg-purple-300"} transition-all duration-700 pt-28 px-8 flex flex-col items-center`}
       >
         {/* 🟣 Header Section */}
-        <div className={`max-w-7xl mx-auto rounded-3xl shadow-xl ${colorVariants.bgLight}/90 backdrop-blur-md p-10 relative overflow-hidden border-2 ${colorVariants.border}`}>
+        <div className={`w-full max-w-7xl rounded-3xl shadow-xl ${colorVariants.bgLight}/90 backdrop-blur-md p-10 relative overflow-hidden border-2 ${colorVariants.border}`}>
           <div className="flex flex-col md:flex-row justify-between items-center gap-10">
             <div className="flex-1 space-y-5">
               <Link
@@ -482,7 +482,7 @@ const CommunityDetail = () => {
         </div>
 
         {/* 💫 Posts Section */}
-        <div className="max-w-7xl mx-auto mt-12">
+        <div className="w-full max-w-7xl mt-12">
           {loading ? (
             <div className={`${colorVariants.bgLight} rounded-3xl shadow-lg p-10 border-2 ${colorVariants.border} max-w-3xl w-full mx-auto`}>
               <p className={`text-center ${colorVariants.text} text-lg`}>Loading...</p>

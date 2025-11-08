@@ -31,6 +31,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import paymentsRoutes from "./routes/payments.js";
 import communityRoutes from "./routes/communities.js";
 import periodRoutes from "./routes/periods.js";
+import collaborationRoutes from "./routes/collaborations.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
@@ -88,11 +89,23 @@ const io = new Server(httpServer, {
 setupVRSocket(io);
 
 // Setup Notifications Socket.IO namespace
+console.log("[Server] Initializing notifications socket...");
 const notificationsSocket = setupNotificationsSocket(io);
 setNotificationsSocket(notificationsSocket);
+console.log("[Server] Notifications socket initialized");
 
 // Setup Random Video Call Socket.IO namespace
 setupRandomVideoSocket(io);
+
+// Debug endpoint to list all Socket.IO namespaces
+app.get("/debug/namespaces", (req, res) => {
+  const namespaces = Array.from(io._nsps.keys());
+  res.json({
+    namespaces,
+    count: namespaces.length,
+    socketIOVersion: require("socket.io/package.json").version,
+  });
+});
 
 // Trust proxy for Vercel deployment
 app.set("trust proxy", 1);
@@ -276,6 +289,7 @@ app.use("/analytics", analyticsRoutes);
 app.use("/payments", paymentsRoutes);
 app.use("/api/communities", communityRoutes);
 app.use("/api/periods", periodRoutes);
+app.use("/api/collaborations", collaborationRoutes);
 
 // Health check endpoint
 app.get("/", (req, res) => {

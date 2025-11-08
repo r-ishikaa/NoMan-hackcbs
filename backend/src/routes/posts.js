@@ -394,8 +394,59 @@ router.post(
           "[Kafka] Failed to publish POST_CREATED event:",
           kafkaError
         );
-        // Fallback: If Kafka fails, we could process synchronously here
-        // For now, we'll just log the error and continue
+
+        // 🔥 FALLBACK: Send notifications directly if Kafka fails
+        if (!isAnonymous) {
+          try {
+            const poster = await User.findById(accountId).select("username");
+            const username = poster?.username || "Someone";
+
+            // Get all followers
+            const followers = await Follow.find({
+              followingId: accountId,
+            }).select("followerId");
+            console.log(
+              `[Direct Notification] Found ${followers.length} followers for user ${accountId}`
+            );
+
+            if (followers.length > 0) {
+              // Create notifications for all followers
+              const notificationData = followers.map((f) => ({
+                recipientId: String(f.followerId),
+                type: "new_post",
+                message: `${username} posted something new.`,
+                relatedUserId: accountId,
+                relatedUsername: username,
+                relatedPostId: String(post._id),
+                relatedReelId: "",
+              }));
+
+              const notifications = await Notification.insertMany(
+                notificationData,
+                { ordered: false }
+              );
+              console.log(
+                `[Direct Notification] Created ${notifications.length} notifications`
+              );
+
+              // Send WebSocket notifications
+              followers.forEach((follower, index) => {
+                const followerId = String(follower.followerId);
+                const notification = notifications[index];
+                if (notification) {
+                  broadcastNotification(
+                    followerId,
+                    notification.toObject
+                      ? notification.toObject()
+                      : notification
+                  );
+                }
+              });
+            }
+          } catch (directError) {
+            console.error("[Direct Notification] Failed:", directError);
+          }
+        }
       }
       res.status(201).json({
         _id: String(post._id),
