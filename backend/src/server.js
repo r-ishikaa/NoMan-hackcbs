@@ -31,6 +31,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import paymentsRoutes from "./routes/payments.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
+import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
 
 // Load environment variables
 dotenv.config();
@@ -83,6 +84,9 @@ setupVRSocket(io);
 // Setup Notifications Socket.IO namespace
 const notificationsSocket = setupNotificationsSocket(io);
 setNotificationsSocket(notificationsSocket);
+
+// Setup Random Video Call Socket.IO namespace
+setupRandomVideoSocket(io);
 
 // Trust proxy for Vercel deployment
 app.set("trust proxy", 1);

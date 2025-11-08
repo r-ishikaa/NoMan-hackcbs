@@ -68,10 +68,10 @@ export const AuthProvider = ({ children }) => {
           console.log('Server error, keeping token for retry')
         } else {
           // Client error (4xx) - clear auth
-          localStorage.removeItem('hexagon_token')
-          setToken(null)
-          setUser(null)
-          setRole(null)
+        localStorage.removeItem('hexagon_token')
+        setToken(null)
+        setUser(null)
+        setRole(null)
         }
       }
     } catch (error) {

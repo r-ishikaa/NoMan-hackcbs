@@ -256,11 +256,11 @@ const Discover = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Compass className="w-8 h-8 text-violet-600" />
-              <div>
+            <div>
                 <h1 className="text-3xl font-bold text-gray-900">Discover</h1>
                 <p className="text-gray-600 text-sm mt-1">
                   Posts from people you follow and recommended content
-                </p>
+              </p>
               </div>
             </div>
             <button
@@ -363,15 +363,15 @@ const Discover = () => {
               };
               return (
                 <div key={post.id || post._id} className="w-full max-w-2xl">
-                  <PostCard
+                <PostCard
                     post={formattedPost}
-                    authorName={profile.displayName || profile.accountId}
-                    authorUsername={profile.accountId}
-                    authorAvatarUrl={profile.avatarUrl}
-                    authorAccountId={post.accountId}
-                    viewerAccountId={user?._id || user?.id}
-                    canDelete={false}
-                  />
+                  authorName={profile.displayName || profile.accountId}
+                  authorUsername={profile.accountId}
+                  authorAvatarUrl={profile.avatarUrl}
+                  authorAccountId={post.accountId}
+                  viewerAccountId={user?._id || user?.id}
+                  canDelete={false}
+                />
                 </div>
               );
             })}

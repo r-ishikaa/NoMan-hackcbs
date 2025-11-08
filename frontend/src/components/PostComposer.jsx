@@ -145,17 +145,17 @@ export default function PostComposer({ onCreated }) {
 
         {/* Bottom Actions */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onPickFiles} className="text-sm" />
-            <span className="text-xs text-zinc-500">Up to 6 images</span>
-          </div>
-          <button
-            onClick={submit}
-            disabled={submitting || (!content.trim() && files.length === 0)}
+        <div className="flex items-center gap-3">
+          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onPickFiles} className="text-sm" />
+          <span className="text-xs text-zinc-500">Up to 6 images</span>
+        </div>
+        <button
+          onClick={submit}
+          disabled={submitting || (!content.trim() && files.length === 0)}
             className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 hover:bg-zinc-800 transition-colors"
-          >
+        >
             {submitting ? 'Posting…' : isAnonymous ? 'Post Anonymously' : 'Post'}
-          </button>
+        </button>
         </div>
       </div>
     </div>

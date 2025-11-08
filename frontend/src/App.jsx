@@ -23,6 +23,7 @@ import ReelsStudio from './components/pages/ReelsStudio.jsx'
 import VR from './components/pages/VR.jsx'
 import ActivityCenter from './components/pages/ActivityCenter.jsx'
 import Discover from './components/pages/Discover.jsx'
+import RandomVideoCall from './components/pages/RandomVideoCall.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Loading from './components/Loading.jsx'
 import { Routes, Route, Outlet, useLocation } from 'react-router-dom'
@@ -98,6 +99,7 @@ function App() {
           <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="activity" element={<ProtectedRoute><ActivityCenter /></ProtectedRoute>} />
           <Route path="discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+          <Route path="video-chat" element={<ProtectedRoute><RandomVideoCall /></ProtectedRoute>} />
           <Route path="loading" element={<Loading />} />
           <Route path="terms" element={<Terms />} />
           <Route path="*" element={<div className="text-center p-8"><h1>404 - Page Not Found</h1></div>} />
