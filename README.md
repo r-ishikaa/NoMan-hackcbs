@@ -2,9 +2,6 @@
   <img src="./Logo.png" alt="Hexagon Logo" width="100" style="border-radius: 50%; display: block; margin: 0 auto;"/>
 </p>
 
-<h1 align="center" style="font-weight: 700; font-size: 2.2rem;">
-  Hexagon
-</h1>
 
 <div align="center">
 
