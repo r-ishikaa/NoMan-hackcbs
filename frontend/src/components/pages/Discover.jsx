@@ -367,15 +367,15 @@ const Discover = () => {
               
               return (
                 <div key={post.id || post._id} className="w-full max-w-2xl">
-                  <PostCard
+                <PostCard
                     post={formattedPost}
                     authorName={isAnonymous ? 'Anonymous' : (profile.displayName || profile.accountId)}
                     authorUsername={isAnonymous ? 'Anonymous' : profile.accountId}
                     authorAvatarUrl={isAnonymous ? null : profile.avatarUrl}
                     authorAccountId={isAnonymous ? null : post.accountId}
-                    viewerAccountId={user?._id || user?.id}
-                    canDelete={false}
-                  />
+                  viewerAccountId={user?._id || user?.id}
+                  canDelete={false}
+                />
                 </div>
               );
             })}

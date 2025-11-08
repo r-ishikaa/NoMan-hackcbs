@@ -55,6 +55,12 @@ export default function RandomVideoCall() {
 
     socket.on('connect', () => {
       console.log('[Video Call] Connected to server');
+      setError(''); // Clear any previous errors
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[Video Call] Connection error:', err.message);
+      setError(`Connection failed: ${err.message}. Please refresh and try again.`);
     });
 
     socket.on('waiting', () => {

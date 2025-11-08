@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change";
+// Get JWT_SECRET dynamically to ensure it's loaded after dotenv.config()
+const getJwtSecret = () =>
+  process.env.JWT_SECRET || "dev-secret-change-please-update-in-production";
 
 // Store waiting users and active calls
 const waitingQueue = new Set(); // Users waiting for a match
@@ -24,28 +26,55 @@ export function setupRandomVideoSocket(io) {
         return next(new Error("Authentication token required"));
       }
 
+      const JWT_SECRET = getJwtSecret();
+
+      console.log(
+        "[Random Video] Token received (first 20 chars):",
+        token.substring(0, 20) + "..."
+      );
+      console.log(
+        "[Random Video] Using JWT_SECRET (first 10 chars):",
+        JWT_SECRET.substring(0, 10) + "..."
+      );
+
       const decoded = jwt.verify(token, JWT_SECRET);
+      console.log(
+        "[Random Video] Token decoded successfully, userId:",
+        decoded.userId
+      );
+
       const user = await User.findById(decoded.userId).select("-password");
 
       if (!user) {
-        console.log("[Random Video] User not found");
+        console.log(
+          "[Random Video] User not found for userId:",
+          decoded.userId
+        );
         return next(new Error("User not found"));
       }
 
       if (!user.isActive) {
-        console.log("[Random Video] User account inactive");
+        console.log("[Random Video] User account inactive:", user.username);
         return next(new Error("Account is deactivated"));
       }
 
       socket.userId = String(user._id);
       socket.username = user.username || "Anonymous";
       console.log(
-        `[Random Video] User authenticated: ${socket.username} (${socket.userId})`
+        `[Random Video] ✅ User authenticated: ${socket.username} (${socket.userId})`
       );
       next();
     } catch (error) {
-      console.error("[Random Video] Authentication error:", error.message);
-      return next(new Error("Authentication failed"));
+      console.error("[Random Video] ❌ Authentication error:", error.message);
+      console.error("[Random Video] Error details:", error.name);
+      if (error.name === "JsonWebTokenError") {
+        console.error(
+          "[Random Video] JWT Error - Token might be from different JWT_SECRET"
+        );
+      } else if (error.name === "TokenExpiredError") {
+        console.error("[Random Video] Token has expired");
+      }
+      return next(new Error("Authentication failed: " + error.message));
     }
   });
 

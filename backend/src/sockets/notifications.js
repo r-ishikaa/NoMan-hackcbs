@@ -2,7 +2,8 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "dev-secret-change-please-update-in-production";
 
 // Store connected users: userId -> socket
 const connectedUsers = new Map();
