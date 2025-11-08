@@ -24,6 +24,9 @@ import VR from './components/pages/VR.jsx'
 import ActivityCenter from './components/pages/ActivityCenter.jsx'
 import Discover from './components/pages/Discover.jsx'
 import RandomVideoCall from './components/pages/RandomVideoCall.jsx'
+import CommunitiesPage from './components/pages/CommunitiesPage.jsx'
+import CommunityDetail from './components/pages/CommunityDetail.jsx'
+import PeriodTracker from './components/pages/PeriodTracker.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Loading from './components/Loading.jsx'
 import { Routes, Route, Outlet, useLocation } from 'react-router-dom'
@@ -100,6 +103,8 @@ function App() {
           <Route path="activity" element={<ProtectedRoute><ActivityCenter /></ProtectedRoute>} />
           <Route path="discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
           <Route path="video-chat" element={<ProtectedRoute><RandomVideoCall /></ProtectedRoute>} />
+          <Route path="communities" element={<CommunitiesPage />} />
+          <Route path="communities/:communityName" element={<CommunityDetail />} />
           <Route path="loading" element={<Loading />} />
           <Route path="terms" element={<Terms />} />
           <Route path="*" element={<div className="text-center p-8"><h1>404 - Page Not Found</h1></div>} />

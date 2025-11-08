@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import API_CONFIG from '../config/api'
 
 function authHeaders() {
@@ -9,7 +10,11 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export default function PostComposer({ onCreated }) {
+export default function PostComposer({ onCreated, communityId: propCommunityId }) {
+  const [searchParams] = useSearchParams()
+  const communityIdFromUrl = searchParams.get('community')
+  const communityId = propCommunityId || communityIdFromUrl || null
+  
   const [content, setContent] = useState('')
   const [files, setFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
@@ -39,6 +44,9 @@ export default function PostComposer({ onCreated }) {
       const tags = `${selectedCourseId ? ` @course(${selectedCourseId})` : ''}${assignmentName.trim() ? ` @assignment(${assignmentName.trim()})` : ''}`
       fd.append('content', `${content.trim()}${tags}`.trim())
       fd.append('isAnonymous', isAnonymous.toString())
+      if (communityId) {
+        fd.append('community', communityId)
+      }
       files.forEach((f) => fd.append('images', f))
       const res = await fetch(API_CONFIG.getApiUrl('/posts'), {
         method: 'POST',
@@ -167,11 +175,13 @@ function formatPost(p) {
     id: p.id || p._id,
     accountId: p.accountId,
     content: p.content,
+    community: p.community || null,
     image: null,
     images: (p.images || []).map((u) => API_CONFIG.getApiUrl(u)),
     likes: Number(p.likes || p.likesCount || 0),
     comments: Number(p.comments || p.commentsCount || 0),
     timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
+    author: p.author || null,
   }
 }
 

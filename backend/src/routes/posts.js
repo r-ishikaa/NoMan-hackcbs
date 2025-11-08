@@ -16,11 +16,11 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024, files: 6 },
 });
 
-// GET /posts?accountId=<id>
+// GET /posts?accountId=<id>&community=<id>
 // Note: When fetching by accountId, anonymous posts are EXCLUDED from public view
 router.get("/", async (req, res) => {
   try {
-    const { accountId } = req.query;
+    const { accountId, community } = req.query;
     const filter = {};
 
     if (accountId) {
@@ -29,23 +29,75 @@ router.get("/", async (req, res) => {
       filter.accountId = String(accountId);
       filter.isAnonymous = { $ne: true }; // Only show non-anonymous posts
     }
-
+    
+    if (community) {
+      // Support both ObjectId strings and regular strings
+      filter.community = mongoose.Types.ObjectId.isValid(community) 
+        ? new mongoose.Types.ObjectId(community)
+        : String(community);
+    }
+    
     const posts = await Post.find(filter).sort({ createdAt: -1 }).limit(100);
-
+    
+    // Fetch user profiles for all posts in parallel to get author information
+    const userIds = [...new Set(posts.map((p) => p.accountId).filter(Boolean))];
+    let userMap = new Map();
+    if (userIds.length > 0) {
+      try {
+        // Convert userIds to ObjectIds if they're valid ObjectId strings
+        const validUserIds = userIds
+          .filter(id => mongoose.Types.ObjectId.isValid(id))
+          .map(id => new mongoose.Types.ObjectId(id));
+        
+        if (validUserIds.length > 0) {
+          const users = await User.find({ _id: { $in: validUserIds } }).select(
+            "username profile.full_name profile.avatar"
+          );
+          userMap = new Map(
+            users.map((u) => [
+              String(u._id),
+              {
+                name: u.profile?.full_name || u.username || "Anonymous",
+                username: u.username,
+                avatarUrl: u.profile?.avatar || null,
+              },
+            ])
+          );
+        }
+      } catch (userError) {
+        console.error("Error fetching users for posts:", userError);
+        // Continue with empty userMap - will use fallback values
+      }
+    }
+    
     // Convert images to URL references
-    const mapped = posts.map((p) => ({
-      _id: String(p._id),
-      id: String(p._id),
-      accountId: p.accountId,
-      content: p.content,
-      images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
-      likes: p.likesCount,
-      comments: p.commentsCount,
-      fundingTotal: p.fundingTotal || 0,
-      fundingCount: p.fundingCount || 0,
-      isAnonymous: p.isAnonymous || false,
-      createdAt: p.createdAt,
-    }));
+    const mapped = posts.map((p) => {
+      const author = userMap.get(String(p.accountId)) || {
+        name: "Anonymous",
+        username: p.accountId,
+        avatarUrl: null,
+      };
+      return {
+        _id: String(p._id),
+        id: String(p._id),
+        accountId: p.isAnonymous ? null : p.accountId, // Hide accountId for anonymous posts
+        content: p.content,
+        community: p.community || null,
+        images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
+        likes: p.likesCount,
+        comments: p.commentsCount,
+        fundingTotal: p.fundingTotal || 0,
+        fundingCount: p.fundingCount || 0,
+        isAnonymous: p.isAnonymous || false,
+        createdAt: p.createdAt,
+        author: {
+          name: author.name,
+          username: author.username,
+          avatarUrl: author.avatarUrl,
+        },
+      };
+    });
+    
     res.json(mapped);
   } catch (err) {
     console.error("posts GET error:", err);
@@ -268,7 +320,7 @@ router.get("/recommended", authenticateToken, async (req, res) => {
   }
 });
 
-// POST /posts (multipart/form-data) fields: content, images[]
+// POST /posts (multipart/form-data) fields: content, images[], optional community
 router.post(
   "/",
   authenticateToken,
@@ -279,6 +331,9 @@ router.post(
       const content = String(req.body.content || "").slice(0, 5000);
       const isAnonymous =
         req.body.isAnonymous === "true" || req.body.isAnonymous === true;
+      const community = mongoose.Types.ObjectId.isValid(req.body.community)
+        ? req.body.community
+        : null;
       const images = (req.files || []).map((f) => ({
         filename: f.originalname,
         contentType: f.mimetype,
@@ -290,6 +345,7 @@ router.post(
         content,
         images,
         isAnonymous,
+        community,
       });
 
       // Notify followers asynchronously (only for non-anonymous posts)
@@ -418,6 +474,7 @@ router.post(
         id: String(post._id),
         accountId: post.accountId,
         content: post.content,
+        community: post.community || null,
         images: (post.images || []).map(
           (_, idx) => `/posts/image/${post._id}/${idx}`
         ),

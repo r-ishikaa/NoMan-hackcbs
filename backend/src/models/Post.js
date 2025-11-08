@@ -20,6 +20,12 @@ const PostSchema = new mongoose.Schema(
     fundingTotal: { type: Number, default: 0 }, // Total funding in cents
     fundingCount: { type: Number, default: 0 }, // Number of donations
     isAnonymous: { type: Boolean, default: false, index: true }, // Anonymous posting flag
+    community: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Community",
+      required: false, // make it optional so old posts don't break
+      index: true,
+    },
   },
   { timestamps: true }
 );

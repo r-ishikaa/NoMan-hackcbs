@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import API_CONFIG from '../../config/api'
 import { 
   IconMapPin as MapPin, 
@@ -13,6 +12,8 @@ import PostCard from '../PostCard'
 import PostComposer from '../PostComposer'
 import ReelComposer from '../ReelComposer'
 import RoleSwitcher from '../RoleSwitcher'
+import { communityData } from '../../data/CommunityData'
+import { Link } from 'react-router-dom'
 
 function authHeaders() {
   const token =
@@ -28,9 +29,12 @@ const Profile = () => {
   const [meId, setMeId] = useState(null)
   const [counts, setCounts] = useState({ followers: 0, following: 0, reels: 0 })
   const [posts, setPosts] = useState([])
+  const [communityPosts, setCommunityPosts] = useState([])
+  const [communitiesMap, setCommunitiesMap] = useState(new Map())
   const [reels, setReels] = useState([])
   const [isFollowing, setIsFollowing] = useState(false)
-  const [activeTab, setActiveTab] = useState('posts')
+  const [activeTab, setActiveTab] = useState('posts') // 'posts' or 'reels'
+  const [postsSubTab, setPostsSubTab] = useState('myPosts') // 'myPosts' or 'community'
   const [selectedReel, setSelectedReel] = useState(null)
   const [playerOpen, setPlayerOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -154,17 +158,74 @@ const Profile = () => {
 
         const postsRes = await fetch(API_CONFIG.getApiUrl(`/posts?accountId=${encodeURIComponent(accountId)}`))
         const fetched = postsRes.ok ? await postsRes.json() : []
-        const normalizedPosts = (Array.isArray(fetched) ? fetched : []).map((p) => ({
-          id: p.id || p._id,
-          accountId: p.accountId,
-          content: p.content,
-          image: null,
-          images: (p.images || []).map((u) => API_CONFIG.getApiUrl(u)),
-          likes: Number(p.likes || p.likesCount || 0),
-          comments: Number(p.comments || p.commentsCount || 0),
-          timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
-        }))
-        setPosts(normalizedPosts)
+        const normalizedPosts = (Array.isArray(fetched) ? fetched : []).map((p) => {
+          // Use post.author if available, otherwise fall back to profile data
+          const author = p.author || {
+            name: profile?.displayName || "Anonymous",
+            username: profile?.accountId || accountId,
+            avatarUrl: profile?.avatarUrl || null,
+          };
+          return {
+            id: p.id || p._id,
+            accountId: p.accountId,
+            content: p.content,
+            image: null,
+            images: (p.images || []).map((u) => API_CONFIG.getApiUrl(u)),
+            likes: Number(p.likes || p.likesCount || 0),
+            comments: Number(p.comments || p.commentsCount || 0),
+            timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
+            community: p.community || null,
+            author: author,
+          };
+        })
+        
+        // Separate regular posts from community posts
+        const regularPosts = normalizedPosts.filter(p => !p.community)
+        const commPosts = normalizedPosts.filter(p => p.community)
+        setPosts(regularPosts)
+        setCommunityPosts(commPosts)
+        
+        // Fetch community details for community posts
+        if (commPosts.length > 0) {
+          const slugify = (text) => text.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-");
+          const communityIds = [...new Set(commPosts.map(p => p.community).filter(Boolean))]
+          try {
+            const communitiesRes = await fetch(API_CONFIG.getApiUrl('/api/communities'))
+            if (communitiesRes.ok) {
+              const allCommunities = await communitiesRes.json()
+              const staticMap = new Map(communityData.map(c => [slugify(c.communityName), c]))
+              const map = new Map()
+              allCommunities.forEach(c => {
+                if (communityIds.some(id => String(id) === String(c._id))) {
+                  // Enrich with static data for bgColor
+                  const staticComm = staticMap.get(c.slug || slugify(c.name))
+                  map.set(String(c._id), {
+                    ...c,
+                    bgColor: c.bgColor || staticComm?.bgColor || "bg-purple-300"
+                  })
+                }
+              })
+              // Also check static communities
+              communityData.forEach(staticComm => {
+                const slug = slugify(staticComm.communityName)
+                allCommunities.forEach(c => {
+                  if (communityIds.some(id => String(id) === String(c._id)) && 
+                      (c.slug === slug || slugify(c.name) === slug)) {
+                    if (!map.has(String(c._id))) {
+                      map.set(String(c._id), {
+                        ...c,
+                        bgColor: staticComm.bgColor || "bg-purple-300"
+                      })
+                    }
+                  }
+                })
+              })
+              setCommunitiesMap(map)
+            }
+          } catch (err) {
+            console.error('Failed to fetch communities:', err)
+          }
+        }
 
         const reelsRes = await fetch(API_CONFIG.getApiUrl('/reels'), {
           headers: authHeaders()
@@ -351,7 +412,7 @@ const Profile = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="text-center group cursor-pointer">
                 <div className="text-3xl md:text-4xl font-bold text-zinc-900 mb-1 group-hover:text-violet-600 transition-colors">
-                  {posts.length}
+                  {posts.length + communityPosts.length}
                 </div>
                 <div className="text-sm text-zinc-600 font-medium">Posts</div>
               </div>
@@ -460,7 +521,110 @@ const Profile = () => {
               {/* Post Composer */}
               {isSelf && activeTab === 'posts' && (
                 <div className="mb-6">
-                  <PostComposer onCreated={(p) => setPosts((arr) => [p, ...arr])} />
+                  <PostComposer onCreated={async (p) => {
+                    // Refetch posts to get author information and proper formatting
+                    try {
+                      const accountId = profile?.accountId;
+                      if (!accountId) return;
+                      
+                      const postsRes = await fetch(API_CONFIG.getApiUrl(`/posts?accountId=${encodeURIComponent(accountId)}`))
+                      const fetched = postsRes.ok ? await postsRes.json() : []
+                      const normalizedPosts = (Array.isArray(fetched) ? fetched : []).map((post) => {
+                        const author = post.author || {
+                          name: profile?.displayName || "Anonymous",
+                          username: profile?.accountId || accountId,
+                          avatarUrl: profile?.avatarUrl || null,
+                        };
+                        return {
+                          id: post.id || post._id,
+                          accountId: post.accountId,
+                          content: post.content,
+                          image: null,
+                          images: (post.images || []).map((u) => API_CONFIG.getApiUrl(u)),
+                          likes: Number(post.likes || post.likesCount || 0),
+                          comments: Number(post.comments || post.commentsCount || 0),
+                          timestamp: new Date(post.createdAt || Date.now()).toLocaleString(),
+                          community: post.community || null,
+                          author: author,
+                        };
+                      })
+                      
+                      // Separate regular posts from community posts
+                      const regularPosts = normalizedPosts.filter(post => !post.community)
+                      const commPosts = normalizedPosts.filter(post => post.community)
+                      setPosts(regularPosts)
+                      setCommunityPosts(commPosts)
+                      
+                      // Fetch community details if needed
+                      if (commPosts.length > 0) {
+                        const slugify = (text) => text.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-");
+                        const communityIds = [...new Set(commPosts.map(post => post.community).filter(Boolean))]
+                        try {
+                          const communitiesRes = await fetch(API_CONFIG.getApiUrl('/api/communities'))
+                          if (communitiesRes.ok) {
+                            const allCommunities = await communitiesRes.json()
+                            const staticMap = new Map(communityData.map(c => [slugify(c.communityName), c]))
+                            const map = new Map()
+                            allCommunities.forEach(c => {
+                              if (communityIds.some(id => String(id) === String(c._id))) {
+                                const staticComm = staticMap.get(c.slug || slugify(c.name))
+                                map.set(String(c._id), {
+                                  ...c,
+                                  bgColor: c.bgColor || staticComm?.bgColor || "bg-purple-300",
+                                  communityName: c.name,
+                                })
+                              }
+                            })
+                            setCommunitiesMap(map)
+                          }
+                        } catch (error) {
+                          console.error('Failed to fetch communities:', error)
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Failed to refresh posts:', error);
+                      // Fallback: add the post with basic info
+                      if (p.community) {
+                        setCommunityPosts((arr) => [p, ...arr])
+                      } else {
+                        setPosts((arr) => [p, ...arr])
+                      }
+                    }
+                  }} />
+                </div>
+              )}
+              
+              {/* Posts Sub-tabs: My Posts | Community Posts */}
+              {activeTab === 'posts' && (
+                <div className="mb-6 border-b border-zinc-200">
+                  <div className="flex gap-8">
+                    <button
+                      onClick={() => setPostsSubTab('myPosts')}
+                      className={`pb-4 px-2 font-semibold text-sm transition-all relative ${
+                        postsSubTab === 'myPosts'
+                          ? 'text-zinc-900'
+                          : 'text-zinc-500 hover:text-zinc-700'
+                      }`}
+                    >
+                      My Posts
+                      {postsSubTab === 'myPosts' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900"></div>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setPostsSubTab('community')}
+                      className={`pb-4 px-2 font-semibold text-sm transition-all relative ${
+                        postsSubTab === 'community'
+                          ? 'text-zinc-900'
+                          : 'text-zinc-500 hover:text-zinc-700'
+                      }`}
+                    >
+                      Community Posts
+                      {postsSubTab === 'community' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900"></div>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -472,16 +636,16 @@ const Profile = () => {
               )}
 
               {/* Posts Content */}
-              {activeTab === 'posts' && (
+              {activeTab === 'posts' && postsSubTab === 'myPosts' && (
                 <div className="space-y-4">
                   {posts.length > 0 ? (
                     posts.map((p) => (
                       <PostCard
                         key={p.id}
                         post={p}
-                        authorName={profile.displayName}
-                        authorUsername={profile.accountId}
-                        authorAvatarUrl={profile.avatarUrl}
+                        authorName={p.author?.name || profile.displayName}
+                        authorUsername={p.author?.username || profile.accountId}
+                        authorAvatarUrl={p.author?.avatarUrl || profile.avatarUrl}
                         authorAccountId={p.accountId}
                         viewerAccountId={meId}
                         canDelete={isSelf && p.accountId === meId}
@@ -506,6 +670,79 @@ const Profile = () => {
                       <p className="text-zinc-600 font-semibold text-lg mb-2">No posts yet</p>
                       {isSelf && (
                         <p className="text-sm text-zinc-500">Share your first post to get started!</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Community Posts Content */}
+              {activeTab === 'posts' && postsSubTab === 'community' && (
+                <div className="space-y-6">
+                  {communityPosts.length > 0 ? (
+                    communityPosts.map((p) => {
+                      const slugify = (text) => text.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-");
+                      const getColorVariants = (bgColor) => {
+                        const colorMap = {
+                          "bg-emerald-300": { button: "bg-emerald-600 hover:bg-emerald-700", border: "border-emerald-600" },
+                          "bg-pink-300": { button: "bg-pink-600 hover:bg-pink-700", border: "border-pink-600" },
+                          "bg-blue-300": { button: "bg-blue-600 hover:bg-blue-700", border: "border-blue-600" },
+                          "bg-orange-300": { button: "bg-orange-600 hover:bg-orange-700", border: "border-orange-600" },
+                          "bg-purple-300": { button: "bg-purple-600 hover:bg-purple-700", border: "border-purple-600" },
+                          "bg-yellow-300": { button: "bg-yellow-600 hover:bg-yellow-700", border: "border-yellow-600" },
+                          "bg-indigo-300": { button: "bg-indigo-600 hover:bg-indigo-700", border: "border-indigo-600" },
+                          "bg-teal-300": { button: "bg-teal-600 hover:bg-teal-700", border: "border-teal-600" },
+                          "bg-rose-300": { button: "bg-rose-600 hover:bg-rose-700", border: "border-rose-600" },
+                          "bg-cyan-300": { button: "bg-cyan-600 hover:bg-cyan-700", border: "border-cyan-600" },
+                          "bg-lime-300": { button: "bg-lime-600 hover:bg-lime-700", border: "border-lime-600" },
+                          "bg-sky-300": { button: "bg-sky-600 hover:bg-sky-700", border: "border-sky-600" },
+                        };
+                        return colorMap[bgColor] || colorMap["bg-purple-300"];
+                      };
+                      const community = p.community ? communitiesMap.get(String(p.community)) : null
+                      const colorVariants = community?.bgColor ? getColorVariants(community.bgColor) : getColorVariants("bg-purple-300")
+                      return (
+                        <div key={p.id} className="space-y-3">
+                          {community && (
+                            <Link to={`/communities/${community.slug || slugify(community.name)}`} className="block">
+                              <div className={`flex items-center gap-2 -mb-1 transition-transform hover:scale-105`}>
+                                <div className={`px-4 py-1.5 ${colorVariants.button} rounded-full text-sm font-semibold border-2 ${colorVariants.border} hover:shadow-md text-white`}>
+                                  {community.name}
+                                </div>
+                              </div>
+                            </Link>
+                          )}
+                          <PostCard
+                            post={p}
+                            authorName={p.author?.name || profile.displayName}
+                            authorUsername={p.author?.username || profile.accountId}
+                            authorAvatarUrl={p.author?.avatarUrl || profile.avatarUrl}
+                            authorAccountId={p.accountId}
+                            viewerAccountId={meId}
+                            canDelete={isSelf && p.accountId === meId}
+                            onDelete={async () => {
+                              try {
+                                const res = await fetch(API_CONFIG.getApiUrl(`/posts/${encodeURIComponent(p.id)}`), {
+                                  method: 'DELETE',
+                                  headers: authHeaders(),
+                                })
+                                if (res.ok) {
+                                  setCommunityPosts((arr) => arr.filter((x) => x.id !== p.id))
+                                }
+                              } catch {}
+                            }}
+                          />
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="text-center py-20">
+                      <div className="w-20 h-20 mx-auto mb-4 bg-zinc-100 rounded-2xl flex items-center justify-center">
+                        <Grid className="h-10 w-10 text-zinc-400" />
+                      </div>
+                      <p className="text-zinc-600 font-semibold text-lg mb-2">No community posts yet</p>
+                      {isSelf && (
+                        <p className="text-sm text-zinc-500">Join communities and start posting!</p>
                       )}
                     </div>
                   )}

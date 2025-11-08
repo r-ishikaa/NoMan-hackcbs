@@ -1,8 +1,9 @@
-import { Home, Bell, LogOut, Menu, Calendar, Clock, ChevronDown, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Home, Bell, LogOut, Menu, Calendar, Clock, ChevronDown, ArrowRight, ArrowUp, ArrowDown, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import React, { useEffect, useMemo, useState } from 'react';
 import API_CONFIG from '../../config/api';
 import { TimelineDemo } from '../ui/timeline-demo';
+import PeriodTracker from './PeriodTracker';
 
 function authHeaders() {
   const token =
@@ -19,6 +20,8 @@ export default function LearningDashboard() {
   const [me, setMe] = useState(null);
   const [profile, setProfile] = useState(null);
   const [currentTab, setCurrentTab] = useState('in_progress');
+  const [joinedCommunities, setJoinedCommunities] = useState([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +53,29 @@ export default function LearningDashboard() {
         }
       } finally {
         if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true };
+  }, []);
+
+  // Fetch joined communities
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(API_CONFIG.getApiUrl('/api/communities/me/joined'), {
+          headers: { ...authHeaders() },
+        });
+        if (res.ok) {
+          const communities = await res.json();
+          if (!cancelled) {
+            setJoinedCommunities(Array.isArray(communities) ? communities : []);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch joined communities:', error);
+      } finally {
+        if (!cancelled) setCommunitiesLoading(false);
       }
     })();
     return () => { cancelled = true };
@@ -279,7 +305,68 @@ export default function LearningDashboard() {
                 ))}
               </div>
             </div>
+
+            {/* Joined Communities */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">My Communities</h3>
+                <Link to="/communities" className="text-sm text-zinc-700 hover:underline">Explore</Link>
+              </div>
+              {communitiesLoading ? (
+                <div className="text-center py-8 text-gray-500">Loading communities...</div>
+              ) : joinedCommunities.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {joinedCommunities.map((community) => {
+                    const slugify = (text) => text.toLowerCase().replace(/&/g, "and").replace(/\s+/g, "-");
+                    const communitySlug = community.slug || slugify(community.name);
+                    return (
+                      <Link
+                        key={community._id}
+                        to={`/communities/${communitySlug}`}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition group"
+                      >
+                        {community.image ? (
+                          <img
+                            src={community.image}
+                            alt={community.name}
+                            className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className={`h-12 w-12 rounded-lg ${community.bgColor || 'bg-purple-300'} flex-shrink-0 flex items-center justify-center text-white font-bold text-lg`}>
+                            {community.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 truncate">{community.name}</div>
+                          <div className="flex items-center gap-2 text-xs text-zinc-600 mt-0.5">
+                            <Users className="w-3 h-3" />
+                            <span>{community.memberCount || 0} members</span>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition flex-shrink-0" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                  <p className="text-sm text-zinc-600 mb-4">You haven't joined any communities yet</p>
+                  <Link
+                    to="/communities"
+                    className="inline-block px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition"
+                  >
+                    Explore Communities
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Period Tracker Section */}
+        <div className="w-full max-w-3xl mx-auto mt-12">
+          <PeriodTracker />
         </div>
 
         {/* Portfolio Analysis Section */}

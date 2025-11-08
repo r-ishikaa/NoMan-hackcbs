@@ -29,6 +29,8 @@ import pushRoutes from "./routes/push.js";
 import vrRoutes, { setupVRSocket } from "./routes/vr.js";
 import analyticsRoutes from "./routes/analytics.js";
 import paymentsRoutes from "./routes/payments.js";
+import communityRoutes from "./routes/communities.js";
+import periodRoutes from "./routes/periods.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
@@ -257,6 +259,8 @@ app.use("/push", pushRoutes);
 app.use("/vr", vrRoutes);
 app.use("/analytics", analyticsRoutes);
 app.use("/payments", paymentsRoutes);
+app.use("/api/communities", communityRoutes);
+app.use("/api/periods", periodRoutes);
 
 // Health check endpoint
 app.get("/", (req, res) => {
