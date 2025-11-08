@@ -255,9 +255,7 @@ router.get("/google/url", (req, res) => {
     authUrl.searchParams.set("prompt", "consent");
 
     // Carry role via OAuth state (validated later). Defaults to 'user'.
-    const requestedRole = (req.query.role || "user")
-      .toString()
-      .toLowerCase();
+    const requestedRole = (req.query.role || "user").toString().toLowerCase();
     const role = ["user", "creator", "enterprise"].includes(requestedRole)
       ? requestedRole
       : "user";
@@ -276,9 +274,9 @@ router.get("/google/url", (req, res) => {
     console.error("Error generating Google OAuth URL:", error);
     // Ensure error response is also JSON
     res.status(500).setHeader("Content-Type", "application/json");
-    res.json({ 
+    res.json({
       error: "Failed to generate OAuth URL",
-      message: error.message || "An unexpected error occurred"
+      message: error.message || "An unexpected error occurred",
     });
   }
 });
@@ -401,7 +399,8 @@ router.get("/google/callback", async (req, res) => {
           const requestedRole = (parsed.role || "user")
             .toString()
             .toLowerCase();
-          if (["user", "creator", "enterprise"].includes(requestedRole)) role = requestedRole;
+          if (["user", "creator", "enterprise"].includes(requestedRole))
+            role = requestedRole;
         }
       } catch (_) {}
 

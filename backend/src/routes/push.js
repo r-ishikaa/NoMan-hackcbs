@@ -81,11 +81,26 @@ router.post("/unsubscribe", authenticateToken, async (req, res) => {
 export const sendPushNotification = async (userId, payload) => {
   try {
     if (!vapidPublicKey || !vapidPrivateKey) {
-      console.warn("VAPID keys not configured, skipping push notification");
-      return;
+      console.warn(
+        `[Push Notification] VAPID keys not configured, skipping push notification for user ${userId}`
+      );
+      return { sent: false, reason: "VAPID keys not configured" };
     }
 
     const subscriptions = await PushSubscription.find({ userId });
+
+    if (subscriptions.length === 0) {
+      console.log(
+        `[Push Notification] No subscriptions found for user ${userId}`
+      );
+      return { sent: false, reason: "No subscriptions found" };
+    }
+
+    console.log(
+      `[Push Notification] Sending to ${subscriptions.length} subscription(s) for user ${userId}`
+    );
+
+    const results = [];
     const promises = subscriptions.map(async (sub) => {
       try {
         await webpush.sendNotification(
@@ -98,21 +113,53 @@ export const sendPushNotification = async (userId, payload) => {
           },
           JSON.stringify(payload)
         );
+        console.log(
+          `[Push Notification] Successfully sent to subscription ${sub._id} for user ${userId}`
+        );
+        results.push({ success: true, subscriptionId: sub._id });
       } catch (err) {
         // If subscription is invalid, remove it
         if (err.statusCode === 410 || err.statusCode === 404) {
+          console.log(
+            `[Push Notification] Removing invalid subscription ${sub._id} for user ${userId}`
+          );
           await PushSubscription.deleteOne({ _id: sub._id });
+          results.push({
+            success: false,
+            subscriptionId: sub._id,
+            error: "Invalid subscription removed",
+          });
         } else {
-          console.error("Push notification error:", err);
+          console.error(
+            `[Push Notification] Error sending to subscription ${sub._id}:`,
+            err.message
+          );
+          results.push({
+            success: false,
+            subscriptionId: sub._id,
+            error: err.message,
+          });
         }
       }
     });
 
     await Promise.allSettled(promises);
+
+    const successCount = results.filter((r) => r.success).length;
+    console.log(
+      `[Push Notification] Sent ${successCount}/${subscriptions.length} notifications for user ${userId}`
+    );
+
+    return {
+      sent: successCount > 0,
+      successCount,
+      totalCount: subscriptions.length,
+      results,
+    };
   } catch (err) {
-    console.error("sendPushNotification error:", err);
+    console.error(`[Push Notification] Error for user ${userId}:`, err);
+    return { sent: false, error: err.message };
   }
 };
 
 export default router;
-

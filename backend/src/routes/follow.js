@@ -51,24 +51,28 @@ router.post("/", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "followingId required" });
     if (followerId === followingId)
       return res.status(400).json({ error: "cannot follow self" });
-    
+
     // Check if already following
     const existing = await Follow.findOne({ followerId, followingId });
     if (existing) {
       return res.status(200).json({ ok: true, alreadyFollowing: true });
     }
-    
+
     await Follow.findOneAndUpdate(
       { followerId, followingId },
       { $setOnInsert: { followerId, followingId } },
       { upsert: true, new: true }
     );
-    
+
     // Send notification to the user being followed
     try {
       const follower = await User.findById(followerId).select("username");
       const username = follower?.username || "Someone";
-      
+
+      console.log(
+        `[Follow Notification] User ${followerId} (${username}) followed user ${followingId}`
+      );
+
       const notification = await Notification.create({
         recipientId: followingId,
         type: "follow",
@@ -78,27 +82,52 @@ router.post("/", authenticateToken, async (req, res) => {
         relatedPostId: "",
         relatedReelId: "",
       });
-      
+
+      console.log(
+        `[Follow Notification] Created notification in database: ${notification._id}`
+      );
+
       // Send via WebSocket (real-time)
-      broadcastNotification(followingId, notification.toObject());
-      
+      try {
+        broadcastNotification(
+          followingId,
+          notification.toObject ? notification.toObject() : notification
+        );
+        console.log(
+          `[Follow Notification] Sent WebSocket notification to user ${followingId}`
+        );
+      } catch (wsError) {
+        console.error(
+          `[Follow Notification] WebSocket error for user ${followingId}:`,
+          wsError
+        );
+      }
+
       // Send web push notification
-      sendPushNotification(followingId, {
-        title: "New Follower",
-        body: `${username} started following you.`,
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        data: {
-          url: `/profile/${followerId}`,
-          userId: followerId,
-        },
-      }).catch((err) => {
-        console.error("Push notification error for user:", followingId, err);
-      });
+      try {
+        await sendPushNotification(followingId, {
+          title: "New Follower",
+          body: `${username} started following you.`,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          data: {
+            url: `/profile/${followerId}`,
+            userId: followerId,
+          },
+        });
+        console.log(
+          `[Follow Notification] Sent push notification to user ${followingId}`
+        );
+      } catch (pushErr) {
+        console.error(
+          `[Follow Notification] Push notification error for user ${followingId}:`,
+          pushErr
+        );
+      }
     } catch (notifErr) {
-      console.error("Notification error on follow:", notifErr);
+      console.error("[Follow Notification] Error:", notifErr);
     }
-    
+
     res.status(201).json({ ok: true });
   } catch (err) {
     console.error("follow create error:", err);
