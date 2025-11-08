@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { sendPushNotification } from "./push.js";
 import { broadcastNotification } from "../utils/notificationBroadcaster.js";
+import { cacheGet, cacheDel } from "../config/redis.js";
 
 const router = express.Router();
 
@@ -14,13 +15,25 @@ router.get("/stats", async (req, res) => {
   try {
     const { accountId } = req.query;
     if (!accountId) return res.json({ followers: 0, following: 0 });
-    const followers = await Follow.countDocuments({
-      followingId: String(accountId),
-    });
-    const following = await Follow.countDocuments({
-      followerId: String(accountId),
-    });
-    res.json({ followers, following });
+
+    const cacheKey = `follow:stats:${accountId}`;
+
+    // Try to get from cache, or fetch from database
+    const stats = await cacheGet(
+      cacheKey,
+      async () => {
+        const followers = await Follow.countDocuments({
+          followingId: String(accountId),
+        });
+        const following = await Follow.countDocuments({
+          followerId: String(accountId),
+        });
+        return { followers, following };
+      },
+      60 // Cache for 1 minute (frequently updated)
+    );
+
+    res.json(stats);
   } catch (err) {
     console.error("follow stats error:", err);
     res.status(500).json({ followers: 0, following: 0 });
@@ -63,6 +76,12 @@ router.post("/", authenticateToken, async (req, res) => {
       { $setOnInsert: { followerId, followingId } },
       { upsert: true, new: true }
     );
+
+    // Invalidate follow stats cache for both users
+    await Promise.all([
+      cacheDel(`follow:stats:${followerId}`),
+      cacheDel(`follow:stats:${followingId}`),
+    ]);
 
     // Send notification to the user being followed
     try {
@@ -145,6 +164,13 @@ router.delete("/", authenticateToken, async (req, res) => {
     if (!followingId)
       return res.status(400).json({ error: "followingId required" });
     await Follow.deleteOne({ followerId, followingId });
+
+    // Invalidate follow stats cache for both users
+    await Promise.all([
+      cacheDel(`follow:stats:${followerId}`),
+      cacheDel(`follow:stats:${followingId}`),
+    ]);
+
     res.json({ ok: true });
   } catch (err) {
     console.error("follow delete error:", err);

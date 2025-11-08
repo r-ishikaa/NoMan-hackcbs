@@ -7,6 +7,7 @@ import { authenticateToken } from "../middleware/auth.js";
 import { authorizeRoles } from "../middleware/auth.js";
 import User from "../models/User.js";
 import Follow from "../models/Follow.js";
+import { cacheGet, cacheDel } from "../config/redis.js";
 
 const router = express.Router();
 
@@ -34,27 +35,43 @@ const upload = multer({
 // Get current user profile
 router.get("/me", authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password");
+    const userId = String(req.user._id);
+    const cacheKey = `user:me:${userId}`;
 
-    if (!user) {
+    // Try to get from cache, or fetch from database
+    const userData = await cacheGet(
+      cacheKey,
+      async () => {
+        const user = await User.findById(userId).select("-password");
+
+        if (!user) {
+          return null;
+        }
+
+        return {
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          provider: user.provider,
+          role: user.role,
+          created_at: user.createdAt,
+          last_login: user.lastLogin,
+          profile: user.profile,
+          // Legacy profiles (kept for backward compatibility)
+          studentProfile: user.studentProfile || {},
+          hrProfile: user.hrProfile || {},
+          // New generic profile data
+          profileData: user.profileData || {},
+        };
+      },
+      300 // Cache for 5 minutes
+    );
+
+    if (!userData) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      provider: user.provider,
-      role: user.role,
-      created_at: user.createdAt,
-      last_login: user.lastLogin,
-      profile: user.profile,
-      // Legacy profiles (kept for backward compatibility)
-      studentProfile: user.studentProfile || {},
-      hrProfile: user.hrProfile || {},
-      // New generic profile data
-      profileData: user.profileData || {},
-    });
+    res.json(userData);
   } catch (error) {
     console.error("Get profile error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -248,11 +265,11 @@ router.post(
       // Also keep in studentProfile for backward compatibility
       const updatedUser = await User.findByIdAndUpdate(
         req.user._id,
-        { 
-          $set: { 
+        {
+          $set: {
             "profileData.resume": resumeData,
-            "studentProfile.resume": resumeData // Backward compatibility
-          } 
+            "studentProfile.resume": resumeData, // Backward compatibility
+          },
         },
         { new: true }
       ).select("-password");
@@ -379,12 +396,12 @@ router.delete("/delete-resume", authenticateToken, async (req, res) => {
   try {
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      { 
-        $unset: { 
-          "profileData.resume": "", 
-          "studentProfile.resume": "", 
-          "profile.resume": "" 
-        } 
+      {
+        $unset: {
+          "profileData.resume": "",
+          "studentProfile.resume": "",
+          "profile.resume": "",
+        },
       },
       { new: true }
     ).select("-password");

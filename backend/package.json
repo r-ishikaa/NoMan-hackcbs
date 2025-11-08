@@ -52,6 +52,7 @@
     "passport-local": "^1.0.0",
     "pdfjs-dist": "^5.4.149",
     "react-i18next": "^16.2.4",
+    "redis": "^5.9.0",
     "socket.io": "^4.8.1",
     "stripe": "^19.3.0",
     "web-push": "^3.6.7"

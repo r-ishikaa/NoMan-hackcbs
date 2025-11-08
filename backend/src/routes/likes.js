@@ -1,6 +1,7 @@
 import express from "express";
 import Like from "../models/Like.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { cacheGet, cacheDel, cacheIncr } from "../config/redis.js";
 
 const router = express.Router();
 
@@ -18,10 +19,25 @@ router.get("/", async (req, res) => {
       targetId: String(targetId),
     };
     if (accountId) filter.accountId = String(accountId);
+
     if (String(count) === "1") {
-      const c = await Like.countDocuments(filter);
-      return res.json({ count: c });
+      // Cache the count query (most common use case)
+      const cacheKey = accountId
+        ? `likes:count:${targetType}:${targetId}:${accountId}`
+        : `likes:count:${targetType}:${targetId}`;
+
+      const result = await cacheGet(
+        cacheKey,
+        async () => {
+          const c = await Like.countDocuments(filter);
+          return { count: c };
+        },
+        30 // Cache for 30 seconds (frequently updated)
+      );
+
+      return res.json(result);
     }
+
     const list = await Like.find(filter).sort({ createdAt: -1 }).limit(200);
     res.json(list);
   } catch (err) {
@@ -46,26 +62,35 @@ router.post("/", authenticateToken, async (req, res) => {
     // Check if like already exists
     const existing = await Like.findOne({ targetType, targetId, accountId });
     const isNewLike = !existing;
-    
+
     const created = await Like.findOneAndUpdate(
       { targetType, targetId, accountId },
       { $setOnInsert: { targetType, targetId, accountId } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    
+
+    // Invalidate like count cache
+    await Promise.all([
+      cacheDel(`likes:count:${targetType}:${targetId}`),
+      cacheDel(`likes:count:${targetType}:${targetId}:${accountId}`),
+    ]);
+
     // Send notification if this is a new like
     if (isNewLike) {
       try {
-        const Notification = (await import("../models/Notification.js")).default;
+        const Notification = (await import("../models/Notification.js"))
+          .default;
         const User = (await import("../models/User.js")).default;
         const Post = (await import("../models/Post.js")).default;
         const Reel = (await import("../models/Reel.js")).default;
-        const { broadcastNotification } = await import("../utils/notificationBroadcaster.js");
+        const { broadcastNotification } = await import(
+          "../utils/notificationBroadcaster.js"
+        );
         const { sendPushNotification } = await import("./push.js");
-        
+
         const liker = await User.findById(accountId).select("username");
         const username = liker?.username || "Someone";
-        
+
         // Handle post likes
         if (targetType === "post") {
           const post = await Post.findById(targetId);
@@ -79,10 +104,13 @@ router.post("/", authenticateToken, async (req, res) => {
               relatedPostId: String(targetId),
               relatedReelId: "",
             });
-            
+
             // Send via WebSocket
-            broadcastNotification(String(post.accountId), notification.toObject ? notification.toObject() : notification);
-            
+            broadcastNotification(
+              String(post.accountId),
+              notification.toObject ? notification.toObject() : notification
+            );
+
             // Send web push notification
             sendPushNotification(String(post.accountId), {
               title: "New Like",
@@ -94,10 +122,15 @@ router.post("/", authenticateToken, async (req, res) => {
                 postId: String(targetId),
               },
             }).catch((err) => {
-              console.error(`[Like Notification] Push notification error:`, err);
+              console.error(
+                `[Like Notification] Push notification error:`,
+                err
+              );
             });
-            
-            console.log(`[Like Notification] Sent notification for post like to ${post.accountId}`);
+
+            console.log(
+              `[Like Notification] Sent notification for post like to ${post.accountId}`
+            );
           }
         }
         // Handle reel likes (if using the Like model for reels)
@@ -113,10 +146,13 @@ router.post("/", authenticateToken, async (req, res) => {
               relatedPostId: "",
               relatedReelId: String(targetId),
             });
-            
+
             // Send via WebSocket
-            broadcastNotification(String(reel.author), notification.toObject ? notification.toObject() : notification);
-            
+            broadcastNotification(
+              String(reel.author),
+              notification.toObject ? notification.toObject() : notification
+            );
+
             // Send web push notification
             sendPushNotification(String(reel.author), {
               title: "New Like",
@@ -128,17 +164,22 @@ router.post("/", authenticateToken, async (req, res) => {
                 reelId: String(targetId),
               },
             }).catch((err) => {
-              console.error(`[Like Notification] Push notification error:`, err);
+              console.error(
+                `[Like Notification] Push notification error:`,
+                err
+              );
             });
-            
-            console.log(`[Like Notification] Sent notification for reel like to ${reel.author}`);
+
+            console.log(
+              `[Like Notification] Sent notification for reel like to ${reel.author}`
+            );
           }
         }
       } catch (notifErr) {
         console.error("[Like Notification] Error:", notifErr);
       }
     }
-    
+
     return res.status(201).json(created);
   } catch (err) {
     if (err && err.code === 11000) {
@@ -154,10 +195,19 @@ router.delete("/", authenticateToken, async (req, res) => {
   try {
     const { targetType, targetId } = req.body || req.query || {};
     if (!targetType || !targetId) {
-      return res.status(400).json({ error: "targetType and targetId required" });
+      return res
+        .status(400)
+        .json({ error: "targetType and targetId required" });
     }
     const accountId = String(req.user._id);
     await Like.deleteOne({ targetType, targetId, accountId });
+
+    // Invalidate like count cache
+    await Promise.all([
+      cacheDel(`likes:count:${targetType}:${targetId}`),
+      cacheDel(`likes:count:${targetType}:${targetId}:${accountId}`),
+    ]);
+
     res.json({ ok: true });
   } catch (err) {
     console.error("likes DELETE error:", err);

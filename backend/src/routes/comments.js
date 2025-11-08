@@ -1,6 +1,7 @@
 import express from "express";
 import Comment from "../models/Comment.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { cacheGet, cacheDel } from "../config/redis.js";
 
 const router = express.Router();
 
@@ -17,10 +18,23 @@ router.get("/", async (req, res) => {
       targetType: String(targetType),
       targetId: String(targetId),
     };
+
     if (String(count) === "1") {
-      const c = await Comment.countDocuments(filter);
-      return res.json({ count: c });
+      // Cache the count query (most common use case)
+      const cacheKey = `comments:count:${targetType}:${targetId}`;
+
+      const result = await cacheGet(
+        cacheKey,
+        async () => {
+          const c = await Comment.countDocuments(filter);
+          return { count: c };
+        },
+        30 // Cache for 30 seconds (frequently updated)
+      );
+
+      return res.json(result);
     }
+
     const list = await Comment.find(filter).sort({ createdAt: -1 }).limit(200);
     res.json(list);
   } catch (err) {
@@ -47,19 +61,24 @@ router.post("/", authenticateToken, async (req, res) => {
       accountId,
       content: String(content).slice(0, 1000),
     });
-    
+
+    // Invalidate comment count cache
+    await cacheDel(`comments:count:${targetType}:${targetId}`);
+
     // Send notification for comments
     try {
       const Notification = (await import("../models/Notification.js")).default;
       const User = (await import("../models/User.js")).default;
       const Post = (await import("../models/Post.js")).default;
       const Reel = (await import("../models/Reel.js")).default;
-      const { broadcastNotification } = await import("../utils/notificationBroadcaster.js");
+      const { broadcastNotification } = await import(
+        "../utils/notificationBroadcaster.js"
+      );
       const { sendPushNotification } = await import("./push.js");
-      
+
       const commenter = await User.findById(accountId).select("username");
       const username = commenter?.username || "Someone";
-      
+
       // Handle post comments
       if (targetType === "post") {
         const post = await Post.findById(targetId);
@@ -73,10 +92,13 @@ router.post("/", authenticateToken, async (req, res) => {
             relatedPostId: String(targetId),
             relatedReelId: "",
           });
-          
+
           // Send via WebSocket
-          broadcastNotification(String(post.accountId), notification.toObject ? notification.toObject() : notification);
-          
+          broadcastNotification(
+            String(post.accountId),
+            notification.toObject ? notification.toObject() : notification
+          );
+
           // Send web push notification
           sendPushNotification(String(post.accountId), {
             title: "New Comment",
@@ -88,10 +110,15 @@ router.post("/", authenticateToken, async (req, res) => {
               postId: String(targetId),
             },
           }).catch((err) => {
-            console.error(`[Comment Notification] Push notification error:`, err);
+            console.error(
+              `[Comment Notification] Push notification error:`,
+              err
+            );
           });
-          
-          console.log(`[Comment Notification] Sent notification for post comment to ${post.accountId}`);
+
+          console.log(
+            `[Comment Notification] Sent notification for post comment to ${post.accountId}`
+          );
         }
       }
       // Handle reel comments
@@ -107,10 +134,13 @@ router.post("/", authenticateToken, async (req, res) => {
             relatedPostId: "",
             relatedReelId: String(targetId),
           });
-          
+
           // Send via WebSocket
-          broadcastNotification(String(reel.author), notification.toObject ? notification.toObject() : notification);
-          
+          broadcastNotification(
+            String(reel.author),
+            notification.toObject ? notification.toObject() : notification
+          );
+
           // Send web push notification
           sendPushNotification(String(reel.author), {
             title: "New Comment",
@@ -122,16 +152,21 @@ router.post("/", authenticateToken, async (req, res) => {
               reelId: String(targetId),
             },
           }).catch((err) => {
-            console.error(`[Comment Notification] Push notification error:`, err);
+            console.error(
+              `[Comment Notification] Push notification error:`,
+              err
+            );
           });
-          
-          console.log(`[Comment Notification] Sent notification for reel comment to ${reel.author}`);
+
+          console.log(
+            `[Comment Notification] Sent notification for reel comment to ${reel.author}`
+          );
         }
       }
     } catch (notifErr) {
       console.error("[Comment Notification] Error:", notifErr);
     }
-    
+
     res.status(201).json(created);
   } catch (err) {
     console.error("comments POST error:", err);

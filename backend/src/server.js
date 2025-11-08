@@ -34,6 +34,7 @@ import periodRoutes from "./routes/periods.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
+import { initRedis, closeRedis } from "./config/redis.js";
 
 // Load environment variables
 dotenv.config();
@@ -306,6 +307,14 @@ const getLocalIP = () => {
 const startServer = async () => {
   await connectDB();
 
+  // Initialize Redis (non-blocking - app works without Redis)
+  initRedis().catch((err) => {
+    console.warn(
+      "[Redis] Failed to connect, continuing without cache:",
+      err.message
+    );
+  });
+
   // Listen on all interfaces (0.0.0.0) to allow network connections
   httpServer.listen(PORT, "0.0.0.0", () => {
     const localIP = getLocalIP();
@@ -324,6 +333,25 @@ const startServer = async () => {
 
 if (!process.env.VERCEL) {
   startServer().catch(console.error);
+
+  // Graceful shutdown
+  process.on("SIGTERM", async () => {
+    console.log("\n🛑 SIGTERM signal received: closing HTTP server");
+    await closeRedis();
+    httpServer.close(() => {
+      console.log("✅ HTTP server closed");
+      process.exit(0);
+    });
+  });
+
+  process.on("SIGINT", async () => {
+    console.log("\n🛑 SIGINT signal received: closing HTTP server");
+    await closeRedis();
+    httpServer.close(() => {
+      console.log("✅ HTTP server closed");
+      process.exit(0);
+    });
+  });
 }
 
 // Export io for potential use in other modules
