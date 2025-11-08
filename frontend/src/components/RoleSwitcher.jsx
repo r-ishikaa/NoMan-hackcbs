@@ -51,16 +51,15 @@ const RoleSwitcher = () => {
       const data = await response.json();
       setMessage(`Successfully switched to ${data.user.role} role!`);
       
-      // Refresh user data
+      // Refresh user data and reload page to ensure UI updates
       if (refreshUser) {
         await refreshUser();
-      } else {
-        // Reload the page to refresh user context
-        window.location.reload();
       }
-
-      setShowSwitcher(false);
-      setTimeout(() => setMessage(null), 3000);
+      
+      // Always reload to ensure all components update with new role
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Role switch error:', error);
       setMessage(error.message || 'Failed to switch role');

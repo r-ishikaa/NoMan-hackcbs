@@ -500,6 +500,7 @@ router.put(
       }
 
       const { role } = req.body;
+      const userId = String(req.user._id);
 
       // Update user role
       const updatedUser = await User.findByIdAndUpdate(
@@ -511,6 +512,12 @@ router.put(
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
       }
+
+      // Invalidate user cache so role updates immediately
+      await cacheDel(`user:me:${userId}`);
+      console.log(
+        `[Cache] Invalidated user cache for ${userId} after role change to ${role}`
+      );
 
       res.json({
         message: "Role updated successfully",
