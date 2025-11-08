@@ -158,6 +158,47 @@ router.post("/confirm", authenticateToken, async (req, res) => {
 
       await payment.save();
 
+      // Send notification to post author about funding
+      try {
+        const Notification = (await import("../models/Notification.js")).default;
+        const User = (await import("../models/User.js")).default;
+        const { broadcastNotification } = await import("../utils/notificationBroadcaster.js");
+        const { sendPushNotification } = await import("./push.js");
+        
+        const donor = await User.findById(payment.donorId).select("username");
+        const donorUsername = donor?.username || "Someone";
+        const amount = (payment.amount / 100).toFixed(2);
+        
+        const notification = await Notification.create({
+          recipientId: payment.recipientId,
+          type: "fund",
+          message: `${donorUsername} funded your post with $${amount}.`,
+          relatedUserId: payment.donorId,
+          relatedUsername: donorUsername,
+          relatedPostId: payment.postId,
+          relatedReelId: "",
+        });
+        
+        // Send via WebSocket
+        broadcastNotification(payment.recipientId, notification.toObject ? notification.toObject() : notification);
+        
+        // Send web push notification
+        sendPushNotification(payment.recipientId, {
+          title: "New Funding",
+          body: `${donorUsername} funded your post with $${amount}.`,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          data: {
+            url: `/profile`,
+            postId: payment.postId,
+          },
+        }).catch((err) => {
+          console.error("Push notification error for funding:", err);
+        });
+      } catch (notifErr) {
+        console.error("Notification error on funding:", notifErr);
+      }
+
       res.json({
         success: true,
         payment: {

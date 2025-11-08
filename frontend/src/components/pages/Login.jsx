@@ -10,7 +10,7 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [googleRole, setGoogleRole] = useState('student')
+  const [googleRole, setGoogleRole] = useState('user')
 
   // Redirect to profile if already authenticated
   useEffect(() => {
@@ -138,8 +138,9 @@ const Login = () => {
                 value={googleRole}
                 onChange={(e) => setGoogleRole(e.target.value)}
               >
-                <option value="student">Sign in as Student</option>
-                <option value="hr">Sign in as HR</option>
+                <option value="user">Sign in as User</option>
+                <option value="creator">Sign in as Creator</option>
+                <option value="enterprise">Sign in as Enterprise</option>
               </select>
             </div>
             <button 

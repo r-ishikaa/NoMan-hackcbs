@@ -32,6 +32,8 @@ const validateSignup = [
     ),
   body("role")
     .optional()
+    .trim()
+    .toLowerCase()
     .isIn(["user", "creator", "enterprise"])
     .withMessage("role must be 'user', 'creator', or 'enterprise'"),
 ];

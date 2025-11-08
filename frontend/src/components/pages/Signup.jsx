@@ -9,7 +9,7 @@ const Signup = () => {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('student')
+  const [role, setRole] = useState('user')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -177,8 +177,9 @@ const Signup = () => {
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
-              <option value="student">Student</option>
-              <option value="hr">HR</option>
+              <option value="user">User</option>
+              <option value="creator">Creator</option>
+              <option value="enterprise">Enterprise</option>
             </select>
           </div>
           

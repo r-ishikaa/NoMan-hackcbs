@@ -40,13 +40,13 @@ const ActivityCenter = () => {
 
   // Check if user is creator
   useEffect(() => {
-    if (!loading && role !== 'creator' && role !== 'admin') {
+    if (!loading && role !== 'creator' && role !== 'enterprise') {
       navigate('/profile');
     }
   }, [role, loading, navigate]);
 
   useEffect(() => {
-    if (token && (role === 'creator' || role === 'admin')) {
+    if (token && (role === 'creator' || role === 'enterprise')) {
       fetchAnalytics();
     }
   }, [token, role, days]);

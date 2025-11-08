@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import API_CONFIG from '../config/api.js'
 import { requestNotificationPermission } from '../utils/pushNotifications.js'
+import { initializeBrowserNotifications } from '../utils/browserNotifications.js'
 
 const AuthContext = createContext()
 
@@ -82,7 +83,9 @@ export const AuthProvider = ({ children }) => {
       try {
         // Small delay to ensure user is fully logged in
         setTimeout(async () => {
+          // Request both push and browser notification permissions
           await requestNotificationPermission()
+          await initializeBrowserNotifications()
         }, 500)
       } catch (err) {
         console.error('Failed to request notification permission:', err)

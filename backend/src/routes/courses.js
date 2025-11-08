@@ -32,7 +32,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// POST /courses - Create a new course (admin only)
+// POST /courses - Create a new course (creator/enterprise only)
 router.post("/", async (req, res) => {
   try {
     const {
@@ -76,11 +76,11 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /courses/:id - Update a course (admin only)
+// PUT /courses/:id - Update a course (creator/enterprise only)
 router.put(
   "/:id",
   authenticateToken,
-  authorizeRoles(["admin"]),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const {
@@ -128,11 +128,11 @@ router.put(
   }
 );
 
-// DELETE /courses/:id - Delete a course (admin only)
+// DELETE /courses/:id - Delete a course (creator/enterprise only)
 router.delete(
   "/:id",
   authenticateToken,
-  authorizeRoles(["admin"]),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const course = await Course.findById(req.params.id);

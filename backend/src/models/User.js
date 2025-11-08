@@ -17,9 +17,15 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["user", "creator", "enterprise", "admin"],
+      enum: ["user", "creator", "enterprise"],
       default: "user",
       required: true,
+      validate: {
+        validator: function(v) {
+          return ["user", "creator", "enterprise"].includes(v);
+        },
+        message: "role must be 'user', 'creator', or 'enterprise'"
+      }
     },
     password: {
       type: String,

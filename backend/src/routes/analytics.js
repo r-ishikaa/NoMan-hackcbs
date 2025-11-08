@@ -34,7 +34,7 @@ const groupByDate = (data, dateField = "createdAt", valueField = "count") => {
 router.get(
   "/overview",
   authenticateToken,
-  authorizeRoles("creator", "admin"),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const userId = String(req.user._id);
@@ -224,7 +224,7 @@ router.get(
 router.get(
   "/activity",
   authenticateToken,
-  authorizeRoles("creator", "admin"),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const userId = String(req.user._id);
@@ -369,7 +369,7 @@ router.get(
 router.get(
   "/posts",
   authenticateToken,
-  authorizeRoles("creator", "admin"),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const userId = String(req.user._id);
@@ -428,7 +428,7 @@ router.get(
 router.get(
   "/reels",
   authenticateToken,
-  authorizeRoles("creator", "admin"),
+  authorizeRoles("creator", "enterprise"),
   async (req, res) => {
     try {
       const userId = String(req.user._id);
