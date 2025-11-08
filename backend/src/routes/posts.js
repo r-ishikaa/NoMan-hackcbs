@@ -27,13 +27,14 @@ router.get("/", async (req, res) => {
     const mapped = posts.map((p) => ({
       _id: String(p._id),
       id: String(p._id),
-      accountId: p.accountId,
+      accountId: p.isAnonymous ? null : p.accountId, // Hide accountId for anonymous posts
       content: p.content,
       images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
       likes: p.likesCount,
       comments: p.commentsCount,
       fundingTotal: p.fundingTotal || 0,
       fundingCount: p.fundingCount || 0,
+      isAnonymous: p.isAnonymous || false,
       createdAt: p.createdAt,
     }));
     res.json(mapped);
@@ -69,13 +70,14 @@ router.get("/following", authenticateToken, async (req, res) => {
     const mapped = posts.map((p) => ({
       _id: String(p._id),
       id: String(p._id),
-      accountId: p.accountId,
+      accountId: p.isAnonymous ? null : p.accountId, // Hide accountId for anonymous posts
       content: p.content,
       images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
       likes: p.likesCount,
       comments: p.commentsCount,
       fundingTotal: p.fundingTotal || 0,
       fundingCount: p.fundingCount || 0,
+      isAnonymous: p.isAnonymous || false,
       createdAt: p.createdAt,
     }));
 
@@ -215,23 +217,37 @@ router.get("/recommended", authenticateToken, async (req, res) => {
       recommendedPosts = [...recommendedPosts, ...recentPosts];
     }
 
-    // Shuffle array to mix different recommendation types
-    recommendedPosts = recommendedPosts.sort(() => Math.random() - 0.5);
+    // Mix in anonymous posts randomly (20% of recommendations)
+    const anonymousLimit = Math.floor(limit * 0.2);
+    const anonymousPosts = await Post.find({
+      isAnonymous: true,
+      accountId: { $ne: userId }, // Exclude user's own anonymous posts
+    })
+      .sort({ createdAt: -1 })
+      .limit(anonymousLimit)
+      .lean();
+
+    // Combine recommended and anonymous posts
+    const allRecommendedPosts = [...recommendedPosts, ...anonymousPosts];
+
+    // Shuffle to mix anonymous posts randomly
+    allRecommendedPosts.sort(() => Math.random() - 0.5);
 
     // Limit to requested amount
-    recommendedPosts = recommendedPosts.slice(0, limit);
+    const finalRecommendedPosts = allRecommendedPosts.slice(0, limit);
 
     // Convert images to URL references
-    const mapped = recommendedPosts.map((p) => ({
+    const mapped = finalRecommendedPosts.map((p) => ({
       _id: String(p._id),
       id: String(p._id),
-      accountId: p.accountId,
+      accountId: p.isAnonymous ? null : p.accountId, // Hide accountId for anonymous posts
       content: p.content,
       images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
       likes: p.likesCount,
       comments: p.commentsCount,
       fundingTotal: p.fundingTotal || 0,
       fundingCount: p.fundingCount || 0,
+      isAnonymous: p.isAnonymous || false,
       createdAt: p.createdAt,
     }));
 
@@ -251,131 +267,141 @@ router.post(
     try {
       const accountId = String(req.user._id);
       const content = String(req.body.content || "").slice(0, 5000);
+      const isAnonymous =
+        req.body.isAnonymous === "true" || req.body.isAnonymous === true;
       const images = (req.files || []).map((f) => ({
         filename: f.originalname,
         contentType: f.mimetype,
         data: f.buffer.toString("base64"),
         size: f.size,
       }));
-      const post = await Post.create({ accountId, content, images });
+      const post = await Post.create({
+        accountId,
+        content,
+        images,
+        isAnonymous,
+      });
 
-      // Notify followers asynchronously (no await for each to keep latency low)
-      try {
-        // Get the poster's username
-        const poster = await User.findById(accountId).select("username");
-        const username = poster?.username || "Someone";
+      // Notify followers asynchronously (only for non-anonymous posts)
+      // Anonymous posts don't send notifications to followers
+      if (!isAnonymous) {
+        try {
+          // Get the poster's username
+          const poster = await User.findById(accountId).select("username");
+          const username = poster?.username || "Someone";
 
-        const followers = await Follow.find({ followingId: accountId }).select(
-          "followerId"
-        );
-        console.log(
-          `[Post Notification] User ${accountId} (${username}) posted. Found ${followers.length} followers.`
-        );
-
-        if (followers.length === 0) {
+          const followers = await Follow.find({
+            followingId: accountId,
+          }).select("followerId");
           console.log(
-            `[Post Notification] No followers found for user ${accountId}`
+            `[Post Notification] User ${accountId} (${username}) posted. Found ${followers.length} followers.`
           );
-        } else {
-          const bulk = followers.map((f) => ({
-            recipientId: String(f.followerId),
-            type: "new_post",
-            message: `${username} posted something new.`,
-            relatedUserId: accountId,
-            relatedUsername: username,
-            relatedPostId: String(post._id),
-            relatedReelId: "",
-          }));
 
-          try {
-            const notifications = await Notification.insertMany(bulk, {
-              ordered: false,
-            });
+          if (followers.length === 0) {
             console.log(
-              `[Post Notification] Created ${notifications.length} notifications in database.`
+              `[Post Notification] No followers found for user ${accountId}`
             );
+          } else {
+            const bulk = followers.map((f) => ({
+              recipientId: String(f.followerId),
+              type: "new_post",
+              message: `${username} posted something new.`,
+              relatedUserId: accountId,
+              relatedUsername: username,
+              relatedPostId: String(post._id),
+              relatedReelId: "",
+            }));
 
-            // Send notifications via WebSocket and web push
-            for (let i = 0; i < followers.length; i++) {
-              const followerId = String(followers[i].followerId);
-              const notification = notifications[i];
-
-              if (!notification) {
-                console.warn(
-                  `[Post Notification] No notification found for follower ${followerId} at index ${i}`
-                );
-                continue;
-              }
-
-              // Send via WebSocket (real-time)
-              try {
-                // Convert Mongoose document to plain object for WebSocket
-                const notificationObj = notification.toObject
-                  ? notification.toObject()
-                  : notification;
-                broadcastNotification(followerId, notificationObj);
-                console.log(
-                  `[Post Notification] Sent WebSocket notification to user ${followerId}`
-                );
-              } catch (wsError) {
-                console.error(
-                  `[Post Notification] WebSocket error for user ${followerId}:`,
-                  wsError
-                );
-              }
-
-              // Send web push notification
-              sendPushNotification(followerId, {
-                title: "New Post",
-                body: `${username} posted something new.`,
-                icon: "/favicon.ico",
-                badge: "/favicon.ico",
-                data: {
-                  url: `/profile`,
-                  postId: String(post._id),
-                },
-              }).catch((err) => {
-                console.error(
-                  `[Post Notification] Push notification error for user ${followerId}:`,
-                  err
-                );
+            try {
+              const notifications = await Notification.insertMany(bulk, {
+                ordered: false,
               });
-            }
-          } catch (insertError) {
-            console.error(
-              "[Post Notification] Error inserting notifications:",
-              insertError
-            );
-            // If bulk insert fails, try inserting one by one
-            console.log(
-              "[Post Notification] Attempting individual notification insertion..."
-            );
-            for (const notifData of bulk) {
-              try {
-                const notif = await Notification.create(notifData);
-                const followerId = notifData.recipientId;
-                broadcastNotification(
-                  followerId,
-                  notif.toObject ? notif.toObject() : notif
-                );
-                console.log(
-                  `[Post Notification] Created and sent notification to user ${followerId}`
-                );
-              } catch (individualError) {
-                console.error(
-                  `[Post Notification] Failed to create notification for ${notifData.recipientId}:`,
-                  individualError
-                );
+              console.log(
+                `[Post Notification] Created ${notifications.length} notifications in database.`
+              );
+
+              // Send notifications via WebSocket and web push
+              for (let i = 0; i < followers.length; i++) {
+                const followerId = String(followers[i].followerId);
+                const notification = notifications[i];
+
+                if (!notification) {
+                  console.warn(
+                    `[Post Notification] No notification found for follower ${followerId} at index ${i}`
+                  );
+                  continue;
+                }
+
+                // Send via WebSocket (real-time)
+                try {
+                  // Convert Mongoose document to plain object for WebSocket
+                  const notificationObj = notification.toObject
+                    ? notification.toObject()
+                    : notification;
+                  broadcastNotification(followerId, notificationObj);
+                  console.log(
+                    `[Post Notification] Sent WebSocket notification to user ${followerId}`
+                  );
+                } catch (wsError) {
+                  console.error(
+                    `[Post Notification] WebSocket error for user ${followerId}:`,
+                    wsError
+                  );
+                }
+
+                // Send web push notification
+                sendPushNotification(followerId, {
+                  title: "New Post",
+                  body: `${username} posted something new.`,
+                  icon: "/favicon.ico",
+                  badge: "/favicon.ico",
+                  data: {
+                    url: `/profile`,
+                    postId: String(post._id),
+                  },
+                }).catch((err) => {
+                  console.error(
+                    `[Post Notification] Push notification error for user ${followerId}:`,
+                    err
+                  );
+                });
+              }
+            } catch (insertError) {
+              console.error(
+                "[Post Notification] Error inserting notifications:",
+                insertError
+              );
+              // If bulk insert fails, try inserting one by one
+              console.log(
+                "[Post Notification] Attempting individual notification insertion..."
+              );
+              for (const notifData of bulk) {
+                try {
+                  const notif = await Notification.create(notifData);
+                  const followerId = notifData.recipientId;
+                  broadcastNotification(
+                    followerId,
+                    notif.toObject ? notif.toObject() : notif
+                  );
+                  console.log(
+                    `[Post Notification] Created and sent notification to user ${followerId}`
+                  );
+                } catch (individualError) {
+                  console.error(
+                    `[Post Notification] Failed to create notification for ${notifData.recipientId}:`,
+                    individualError
+                  );
+                }
               }
             }
           }
+        } catch (e) {
+          console.error(
+            "[Post Notification] notify followers error:",
+            e?.message || e
+          );
+          console.error("[Post Notification] Stack trace:", e?.stack);
         }
-      } catch (e) {
-        console.error(
-          "[Post Notification] notify followers error:",
-          e?.message || e
-        );
-        console.error("[Post Notification] Stack trace:", e?.stack);
       }
       res.status(201).json({
         _id: String(post._id),
@@ -389,6 +415,7 @@ router.post(
         comments: post.commentsCount,
         fundingTotal: post.fundingTotal || 0,
         fundingCount: post.fundingCount || 0,
+        isAnonymous: post.isAnonymous || false,
         createdAt: post.createdAt,
       });
     } catch (err) {
@@ -417,6 +444,106 @@ router.get("/image/:postId/:index", async (req, res) => {
   } catch (err) {
     console.error("posts image GET error:", err);
     res.status(500).send();
+  }
+});
+
+// GET /posts/anonymous - Get all anonymous posts (public, no auth required)
+router.get("/anonymous", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const posts = await Post.find({
+      isAnonymous: true,
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await Post.countDocuments({ isAnonymous: true });
+
+    // Convert images to URL references
+    const mapped = posts.map((p) => ({
+      _id: String(p._id),
+      id: String(p._id),
+      accountId: null, // Always hide accountId for anonymous posts
+      content: p.content,
+      images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
+      likes: p.likesCount,
+      comments: p.commentsCount,
+      fundingTotal: p.fundingTotal || 0,
+      fundingCount: p.fundingCount || 0,
+      isAnonymous: true,
+      createdAt: p.createdAt,
+    }));
+
+    res.json({
+      posts: mapped,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("posts anonymous GET error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /posts/my-anonymous - Get user's own anonymous posts (requires auth)
+router.get("/my-anonymous", authenticateToken, async (req, res) => {
+  try {
+    const userId = String(req.user._id);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const posts = await Post.find({
+      accountId: userId,
+      isAnonymous: true,
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await Post.countDocuments({
+      accountId: userId,
+      isAnonymous: true,
+    });
+
+    // Convert images to URL references
+    // For user's own posts, we can show accountId so they know it's theirs
+    const mapped = posts.map((p) => ({
+      _id: String(p._id),
+      id: String(p._id),
+      accountId: p.accountId, // Show accountId for user's own posts
+      content: p.content,
+      images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
+      likes: p.likesCount,
+      comments: p.commentsCount,
+      fundingTotal: p.fundingTotal || 0,
+      fundingCount: p.fundingCount || 0,
+      isAnonymous: true,
+      createdAt: p.createdAt,
+    }));
+
+    res.json({
+      posts: mapped,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("posts my-anonymous GET error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

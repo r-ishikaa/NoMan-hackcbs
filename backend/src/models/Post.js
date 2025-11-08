@@ -19,11 +19,14 @@ const PostSchema = new mongoose.Schema(
     commentsCount: { type: Number, default: 0 },
     fundingTotal: { type: Number, default: 0 }, // Total funding in cents
     fundingCount: { type: Number, default: 0 }, // Number of donations
+    isAnonymous: { type: Boolean, default: false, index: true }, // Anonymous posting flag
   },
   { timestamps: true }
 );
 
 PostSchema.index({ createdAt: -1 });
+PostSchema.index({ isAnonymous: 1, createdAt: -1 });
+PostSchema.index({ accountId: 1, isAnonymous: 1 });
 
 const Post = mongoose.models.Post || mongoose.model("Post", PostSchema);
 export default Post;

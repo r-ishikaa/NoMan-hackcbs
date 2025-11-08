@@ -21,7 +21,6 @@ function authHeaders() {
 
 const Discover = () => {
   const { user, token, loading: authLoading, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState('following'); // 'following' or 'discover'
   const [followingPosts, setFollowingPosts] = useState([]);
   const [recommendedPosts, setRecommendedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,16 +45,13 @@ const Discover = () => {
     const currentToken = getToken();
     if (currentToken && (isAuthenticated() || user)) {
       fetchFollowingCount();
-      if (activeTab === 'following') {
-        fetchFollowingFeed();
-      } else {
-        fetchRecommendedPosts();
-      }
+      fetchFollowingFeed();
+      fetchRecommendedPosts();
     } else {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, authLoading, isAuthenticated, activeTab]);
+  }, [token, user, authLoading, isAuthenticated]);
 
   const fetchFollowingFeed = async () => {
     const currentToken = getToken();
@@ -206,11 +202,8 @@ const Discover = () => {
   };
 
   const handleRefresh = () => {
-    if (activeTab === 'following') {
-      fetchFollowingFeed();
-    } else {
-      fetchRecommendedPosts();
-    }
+    fetchFollowingFeed();
+    fetchRecommendedPosts();
   };
 
   // Wait for auth to load
@@ -251,23 +244,22 @@ const Discover = () => {
     );
   }
 
-  const currentPosts = activeTab === 'following' ? followingPosts : recommendedPosts;
+  // Combine following and recommended posts
+  const allPosts = [...followingPosts, ...recommendedPosts];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-16 pb-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-16 pb-8 px-4 flex justify-center">
       {/* Centered Container */}
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl w-full">
         {/* Header */}
         <div className="mb-6 bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Compass className="w-8 h-8 text-violet-600" />
-            <div>
+              <div>
                 <h1 className="text-3xl font-bold text-gray-900">Discover</h1>
                 <p className="text-gray-600 text-sm mt-1">
-                  {activeTab === 'following' 
-                    ? 'Posts from people you follow' 
-                    : 'Discover trending and recommended content'}
+                  Posts from people you follow and recommended content
                 </p>
               </div>
             </div>
@@ -280,80 +272,23 @@ const Discover = () => {
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200">
-            <button
-              onClick={() => {
-                setActiveTab('following');
-                if (followingPosts.length === 0) {
-                  fetchFollowingFeed();
-                }
-              }}
-              className={`px-4 py-2 font-medium text-sm transition-colors relative ${
-                activeTab === 'following'
-                  ? 'text-violet-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span>Following</span>
-                {followingCount > 0 && (
-                  <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-                    {followingCount}
-                  </span>
-                )}
-              </div>
-              {activeTab === 'following' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600"></div>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('discover');
-                if (recommendedPosts.length === 0) {
-                  fetchRecommendedPosts();
-                }
-              }}
-              className={`px-4 py-2 font-medium text-sm transition-colors relative ${
-                activeTab === 'discover'
-                  ? 'text-violet-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Discover</span>
-              </div>
-              {activeTab === 'discover' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600"></div>
-              )}
-            </button>
-          </div>
-
           {/* Stats */}
-          <div className="mt-4 flex items-center gap-6 text-sm text-gray-600">
-            {activeTab === 'following' && (
-              <>
-                <div className="flex items-center gap-2">
+          <div className="flex items-center gap-6 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               <span>
-                    Following <span className="font-semibold text-gray-900">{followingCount}</span> people
+                Following <span className="font-semibold text-gray-900">{followingCount}</span> people
               </span>
             </div>
-                <div>
-                  <span className="font-semibold text-gray-900">{followingPosts.length}</span> posts
-                </div>
-              </>
-            )}
-            {activeTab === 'discover' && (
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                <span>
-                  <span className="font-semibold text-gray-900">{recommendedPosts.length}</span> recommendations
-                </span>
+            <div>
+              <span className="font-semibold text-gray-900">{followingPosts.length}</span> following posts
             </div>
-            )}
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>
+                <span className="font-semibold text-gray-900">{recommendedPosts.length}</span> recommended
+              </span>
+            </div>
           </div>
         </div>
 
@@ -371,23 +306,17 @@ const Discover = () => {
         )}
 
         {/* Loading State */}
-        {loading && currentPosts.length === 0 && (
+        {loading && allPosts.length === 0 && (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">
-              {activeTab === 'following' 
-                ? 'Loading posts from people you follow...' 
-                : 'Loading recommendations...'}
-            </p>
+            <p className="text-gray-600">Loading posts...</p>
           </div>
         )}
 
         {/* Empty State */}
-        {!loading && currentPosts.length === 0 && !error && (
+        {!loading && allPosts.length === 0 && !error && (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            {activeTab === 'following' ? (
-              <>
-                <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               No posts yet
             </h2>
@@ -405,37 +334,19 @@ const Discover = () => {
               </Link>
             ) : (
               <button
-                    onClick={handleRefresh}
+                onClick={handleRefresh}
                 className="px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium"
               >
                 Refresh Feed
               </button>
-                )}
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  No recommendations yet
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  We're working on finding great content for you. Check back soon!
-                </p>
-                <button
-                  onClick={handleRefresh}
-                  className="px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium"
-                >
-                  Refresh
-                </button>
-              </>
             )}
           </div>
         )}
 
         {/* Posts Feed */}
-        {!loading && currentPosts.length > 0 && (
+        {!loading && allPosts.length > 0 && (
           <div className="space-y-4 flex flex-col items-center">
-            {currentPosts.map((post) => {
+            {allPosts.map((post) => {
               const profile = profiles[post.accountId] || {};
               // Convert image paths to full URLs
               const formattedPost = {
@@ -468,10 +379,10 @@ const Discover = () => {
         )}
 
         {/* Load More Info */}
-        {currentPosts.length > 0 && currentPosts.length >= 100 && (
+        {allPosts.length > 0 && allPosts.length >= 100 && (
           <div className="mt-6 text-center">
             <p className="text-gray-500 text-sm">
-              Showing latest {currentPosts.length} posts
+              Showing latest {allPosts.length} posts
             </p>
           </div>
         )}

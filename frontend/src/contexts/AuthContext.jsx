@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import API_CONFIG from '../config/api.js'
-import { requestNotificationPermission, subscribeToPush, registerServiceWorker } from '../utils/pushNotifications.js'
-import { initializeBrowserNotifications } from '../utils/browserNotifications.js'
 
 const AuthContext = createContext()
 
@@ -77,33 +75,6 @@ export const AuthProvider = ({ children }) => {
     setToken(authToken)
     localStorage.setItem('hexagon_token', authToken)
     await fetchUserProfile(authToken)
-    
-    // Request notification permission and subscribe to push notifications immediately after login
-    if (authToken) {
-      try {
-        // Small delay to ensure user is fully logged in
-        setTimeout(async () => {
-          // Register service worker first
-          await registerServiceWorker()
-          
-          // Request both push and browser notification permissions
-          const hasPermission = await requestNotificationPermission()
-          await initializeBrowserNotifications()
-          
-          // Subscribe to push notifications if permission granted
-          if (hasPermission) {
-            try {
-              await subscribeToPush()
-              console.log('Successfully subscribed to push notifications')
-            } catch (pushErr) {
-              console.error('Failed to subscribe to push notifications:', pushErr)
-            }
-          }
-        }, 1000)
-      } catch (err) {
-        console.error('Failed to request notification permission:', err)
-      }
-    }
   }
 
   const logout = () => {
