@@ -134,12 +134,33 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 // Rate limiting (after CORS so 429 responses still have ACAO)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
+// More lenient rate limiter for auth routes
+// In development, allow more requests; in production, be stricter
+const isDevelopment = process.env.NODE_ENV !== "production";
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDevelopment ? 200 : 50, // More lenient in development
+  message: "Too many authentication attempts, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful logins
 });
+
+// General rate limiter for other routes (skips /auth routes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Increased from 300 to 500 for general routes
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for auth routes (they have their own limiter)
+    return req.path.startsWith("/auth");
+  },
+});
+
+// Apply auth rate limiter to auth routes first
+app.use("/auth", authLimiter);
+// Apply general rate limiter to all other routes
 app.use(limiter);
 // After your cors() middleware, add:
 app.options("*", cors());
