@@ -131,6 +131,7 @@ export function setupRandomVideoSocket(io) {
       console.log(`[Random Video] Offer from ${socket.username} in ${roomId}`);
       socket.to(roomId).emit("offer", {
         offer,
+        roomId, // ✅ ADD: Send roomId back to client
         from: socket.id,
         fromUsername: socket.username,
       });
@@ -141,6 +142,7 @@ export function setupRandomVideoSocket(io) {
       console.log(`[Random Video] Answer from ${socket.username} in ${roomId}`);
       socket.to(roomId).emit("answer", {
         answer,
+        roomId, // ✅ ADD: Send roomId back to client
         from: socket.id,
       });
     });
@@ -150,6 +152,7 @@ export function setupRandomVideoSocket(io) {
       console.log(`[Random Video] ICE candidate from ${socket.username}`);
       socket.to(roomId).emit("ice-candidate", {
         candidate,
+        roomId, // ✅ ADD: Send roomId back to client
         from: socket.id,
       });
     });
