@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import mongoose from "mongoose";
 import ScheduledPost from "../models/ScheduledPost.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateToken, optionalAuth } from "../middleware/auth.js";
 import User from "../models/User.js";
 
 const router = express.Router();
@@ -24,22 +24,26 @@ const getUserId = (req) => {
 
 /* ============================================================
    ✅ GET /scheduled-posts
-   Get all scheduled posts for a user (or all if admin)
-   Query params: accountId (optional)
+   Get all scheduled posts for a user (public access allowed)
+   Query params: accountId (required for public access)
 ============================================================ */
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const { accountId } = req.query;
     const filter = {};
 
-    // If accountId is provided, filter by it
+    // If accountId is provided, filter by it (public access)
     if (accountId) {
       filter.accountId = String(accountId);
     } else {
-      // If no accountId, get current user's scheduled posts
+      // If no accountId, get current user's scheduled posts (requires auth)
       const userId = getUserId(req);
       if (userId) {
         filter.accountId = userId;
+      } else {
+        return res
+          .status(400)
+          .json({ error: "accountId is required for public access" });
       }
     }
 
@@ -51,7 +55,9 @@ router.get("/", authenticateToken, async (req, res) => {
       .limit(100);
 
     // Fetch user profiles for author information
-    const userIds = [...new Set(scheduledPosts.map((p) => p.accountId).filter(Boolean))];
+    const userIds = [
+      ...new Set(scheduledPosts.map((p) => p.accountId).filter(Boolean)),
+    ];
     let userMap = new Map();
     if (userIds.length > 0) {
       try {
@@ -74,15 +80,17 @@ router.get("/", authenticateToken, async (req, res) => {
         }
 
         // Also try by username for non-ObjectId accountIds
-        const stringUserIds = userIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+        const stringUserIds = userIds.filter(
+          (id) => !mongoose.Types.ObjectId.isValid(id)
+        );
         if (stringUserIds.length > 0) {
-          const usersByUsername = await User.find({ 
+          const usersByUsername = await User.find({
             $or: [
               { username: { $in: stringUserIds } },
-              { _id: { $in: stringUserIds } }
-            ]
+              { _id: { $in: stringUserIds } },
+            ],
           }).select("username profile.full_name profile.avatar");
-          
+
           usersByUsername.forEach((u) => {
             const key = String(u._id);
             if (!userMap.has(key)) {
@@ -110,20 +118,32 @@ router.get("/", authenticateToken, async (req, res) => {
     // Format response
     const mapped = scheduledPosts.map((p) => {
       // Try to get author info by accountId (as string) or by ObjectId string
-      const author = userMap.get(String(p.accountId)) || 
-                     userMap.get(p.accountId) || 
-                     {
-        name: "Anonymous",
-        username: p.accountId ? String(p.accountId).substring(0, 20) : "anonymous",
-        avatarUrl: null,
-      };
+      const author = userMap.get(String(p.accountId)) ||
+        userMap.get(p.accountId) || {
+          name: "Anonymous",
+          username: p.accountId
+            ? String(p.accountId).substring(0, 20)
+            : "anonymous",
+          avatarUrl: null,
+        };
+
+      // Calculate time until release
+      const now = new Date();
+      const scheduledDate = new Date(p.scheduledDate);
+      const timeUntilRelease = p.isReleased
+        ? null
+        : Math.max(0, scheduledDate.getTime() - now.getTime());
 
       return {
         _id: String(p._id),
         id: String(p._id),
         accountId: p.isAnonymous && !p.isReleased ? null : p.accountId, // Hide accountId for anonymous unreleased posts
-        content: p.content,
-        images: (p.images || []).map((_, idx) => `/scheduled-posts/image/${p._id}/${idx}`),
+        content: p.isReleased ? p.content : "", // Hide content if not released
+        images: p.isReleased
+          ? (p.images || []).map(
+              (_, idx) => `/scheduled-posts/image/${p._id}/${idx}`
+            )
+          : [], // Hide images if not released
         scheduledDate: p.scheduledDate,
         isReleased: p.isReleased,
         releasedAt: p.releasedAt,
@@ -139,6 +159,7 @@ router.get("/", authenticateToken, async (req, res) => {
           username: author.username,
           avatarUrl: author.avatarUrl,
         },
+        timeUntilRelease: timeUntilRelease, // Time in milliseconds until release
       };
     });
 
@@ -194,7 +215,9 @@ router.get("/:id", authenticateToken, async (req, res) => {
       id: String(post._id),
       accountId: post.isAnonymous && !post.isReleased ? null : post.accountId,
       content: post.content,
-      images: (post.images || []).map((_, idx) => `/scheduled-posts/image/${post._id}/${idx}`),
+      images: (post.images || []).map(
+        (_, idx) => `/scheduled-posts/image/${post._id}/${idx}`
+      ),
       scheduledDate: post.scheduledDate,
       isReleased: post.isReleased,
       releasedAt: post.releasedAt,
@@ -217,210 +240,231 @@ router.get("/:id", authenticateToken, async (req, res) => {
    ✅ POST /scheduled-posts
    Create a new scheduled post
 ============================================================ */
-router.post("/", authenticateToken, upload.array("images", 6), async (req, res) => {
-  try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const { content, scheduledDate, isAnonymous, community } = req.body;
-
-    if (!scheduledDate) {
-      return res.status(400).json({ error: "scheduledDate is required" });
-    }
-
-    const scheduledDateObj = new Date(scheduledDate);
-    if (isNaN(scheduledDateObj.getTime())) {
-      return res.status(400).json({ error: "Invalid scheduledDate format" });
-    }
-
-    // Don't allow scheduling in the past
-    if (scheduledDateObj <= new Date()) {
-      return res.status(400).json({ error: "scheduledDate must be in the future" });
-    }
-
-    const images = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        images.push({
-          filename: file.originalname,
-          contentType: file.mimetype,
-          data: bufferToBase64(file.buffer, file.mimetype),
-          size: file.size,
-        });
-      }
-    }
-
-    const scheduledPost = new ScheduledPost({
-      accountId: String(userId),
-      content: content || "",
-      images: images,
-      scheduledDate: scheduledDateObj,
-      isReleased: false,
-      isAnonymous: isAnonymous === "true" || isAnonymous === true,
-      community: community && mongoose.Types.ObjectId.isValid(community)
-        ? new mongoose.Types.ObjectId(community)
-        : null,
-    });
-
-    await scheduledPost.save();
-
-    // Fetch author information
-    let author = {
-      name: "Anonymous",
-      username: String(userId),
-      avatarUrl: null,
-    };
-
+router.post(
+  "/",
+  authenticateToken,
+  upload.array("images", 6),
+  async (req, res) => {
     try {
-      const user = await User.findById(userId).select(
-        "username profile.full_name profile.avatar"
-      );
-      if (user) {
-        author = {
-          name: user.profile?.full_name || user.username || "Anonymous",
-          username: user.username,
-          avatarUrl: user.profile?.avatar || null,
-        };
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
       }
-    } catch (userError) {
-      console.error("Error fetching user for scheduled post:", userError);
-    }
 
-    res.status(201).json({
-      _id: String(scheduledPost._id),
-      id: String(scheduledPost._id),
-      accountId: scheduledPost.accountId,
-      content: scheduledPost.content,
-      images: scheduledPost.images.map((_, idx) => `/scheduled-posts/image/${scheduledPost._id}/${idx}`),
-      scheduledDate: scheduledPost.scheduledDate,
-      isReleased: scheduledPost.isReleased,
-      likes: scheduledPost.likesCount,
-      comments: scheduledPost.commentsCount,
-      fundingTotal: scheduledPost.fundingTotal || 0,
-      fundingCount: scheduledPost.fundingCount || 0,
-      isAnonymous: scheduledPost.isAnonymous || false,
-      community: scheduledPost.community || null,
-      createdAt: scheduledPost.createdAt,
-      author: author,
-    });
-  } catch (err) {
-    console.error("scheduled-posts POST error:", err);
-    res.status(500).json({ error: "Internal server error" });
+      const { content, scheduledDate, isAnonymous, community } = req.body;
+
+      if (!scheduledDate) {
+        return res.status(400).json({ error: "scheduledDate is required" });
+      }
+
+      const scheduledDateObj = new Date(scheduledDate);
+      if (isNaN(scheduledDateObj.getTime())) {
+        return res.status(400).json({ error: "Invalid scheduledDate format" });
+      }
+
+      // Don't allow scheduling in the past
+      if (scheduledDateObj <= new Date()) {
+        return res
+          .status(400)
+          .json({ error: "scheduledDate must be in the future" });
+      }
+
+      const images = [];
+      if (req.files && req.files.length > 0) {
+        for (const file of req.files) {
+          images.push({
+            filename: file.originalname,
+            contentType: file.mimetype,
+            data: bufferToBase64(file.buffer, file.mimetype),
+            size: file.size,
+          });
+        }
+      }
+
+      const scheduledPost = new ScheduledPost({
+        accountId: String(userId),
+        content: content || "",
+        images: images,
+        scheduledDate: scheduledDateObj,
+        isReleased: false,
+        isAnonymous: isAnonymous === "true" || isAnonymous === true,
+        community:
+          community && mongoose.Types.ObjectId.isValid(community)
+            ? new mongoose.Types.ObjectId(community)
+            : null,
+      });
+
+      await scheduledPost.save();
+
+      // Fetch author information
+      let author = {
+        name: "Anonymous",
+        username: String(userId),
+        avatarUrl: null,
+      };
+
+      try {
+        const user = await User.findById(userId).select(
+          "username profile.full_name profile.avatar"
+        );
+        if (user) {
+          author = {
+            name: user.profile?.full_name || user.username || "Anonymous",
+            username: user.username,
+            avatarUrl: user.profile?.avatar || null,
+          };
+        }
+      } catch (userError) {
+        console.error("Error fetching user for scheduled post:", userError);
+      }
+
+      res.status(201).json({
+        _id: String(scheduledPost._id),
+        id: String(scheduledPost._id),
+        accountId: scheduledPost.accountId,
+        content: scheduledPost.content,
+        images: scheduledPost.images.map(
+          (_, idx) => `/scheduled-posts/image/${scheduledPost._id}/${idx}`
+        ),
+        scheduledDate: scheduledPost.scheduledDate,
+        isReleased: scheduledPost.isReleased,
+        likes: scheduledPost.likesCount,
+        comments: scheduledPost.commentsCount,
+        fundingTotal: scheduledPost.fundingTotal || 0,
+        fundingCount: scheduledPost.fundingCount || 0,
+        isAnonymous: scheduledPost.isAnonymous || false,
+        community: scheduledPost.community || null,
+        createdAt: scheduledPost.createdAt,
+        author: author,
+      });
+    } catch (err) {
+      console.error("scheduled-posts POST error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
+);
 
 /* ============================================================
    ✅ PUT /scheduled-posts/:id
    Update a scheduled post (only if not released)
 ============================================================ */
-router.put("/:id", authenticateToken, upload.array("images", 6), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = getUserId(req);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const post = await ScheduledPost.findById(id);
-    if (!post) {
-      return res.status(404).json({ error: "Scheduled post not found" });
-    }
-
-    // Check ownership
-    if (String(post.accountId) !== String(userId)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
-    // Don't allow editing if already released
-    if (post.isReleased) {
-      return res.status(400).json({ error: "Cannot edit a released post" });
-    }
-
-    const { content, scheduledDate, isAnonymous, community } = req.body;
-
-    if (content !== undefined) post.content = content;
-    if (scheduledDate !== undefined) {
-      const scheduledDateObj = new Date(scheduledDate);
-      if (isNaN(scheduledDateObj.getTime())) {
-        return res.status(400).json({ error: "Invalid scheduledDate format" });
-      }
-      if (scheduledDateObj <= new Date()) {
-        return res.status(400).json({ error: "scheduledDate must be in the future" });
-      }
-      post.scheduledDate = scheduledDateObj;
-    }
-    if (isAnonymous !== undefined) {
-      post.isAnonymous = isAnonymous === "true" || isAnonymous === true;
-    }
-    if (community !== undefined) {
-      post.community =
-        community && mongoose.Types.ObjectId.isValid(community)
-          ? new mongoose.Types.ObjectId(community)
-          : null;
-    }
-
-    // Update images if provided
-    if (req.files && req.files.length > 0) {
-      const images = [];
-      for (const file of req.files) {
-        images.push({
-          filename: file.originalname,
-          contentType: file.mimetype,
-          data: bufferToBase64(file.buffer, file.mimetype),
-          size: file.size,
-        });
-      }
-      post.images = images;
-    }
-
-    await post.save();
-
-    // Fetch author information
-    let author = {
-      name: "Anonymous",
-      username: String(userId),
-      avatarUrl: null,
-    };
-
+router.put(
+  "/:id",
+  authenticateToken,
+  upload.array("images", 6),
+  async (req, res) => {
     try {
-      const user = await User.findById(userId).select(
-        "username profile.full_name profile.avatar"
-      );
-      if (user) {
-        author = {
-          name: user.profile?.full_name || user.username || "Anonymous",
-          username: user.username,
-          avatarUrl: user.profile?.avatar || null,
-        };
+      const { id } = req.params;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
       }
-    } catch (userError) {
-      console.error("Error fetching user for scheduled post:", userError);
-    }
 
-    res.json({
-      _id: String(post._id),
-      id: String(post._id),
-      accountId: post.accountId,
-      content: post.content,
-      images: post.images.map((_, idx) => `/scheduled-posts/image/${post._id}/${idx}`),
-      scheduledDate: post.scheduledDate,
-      isReleased: post.isReleased,
-      likes: post.likesCount,
-      comments: post.commentsCount,
-      fundingTotal: post.fundingTotal || 0,
-      fundingCount: post.fundingCount || 0,
-      isAnonymous: post.isAnonymous || false,
-      community: post.community || null,
-      createdAt: post.createdAt,
-      author: author,
-    });
-  } catch (err) {
-    console.error("scheduled-posts PUT error:", err);
-    res.status(500).json({ error: "Internal server error" });
+      const post = await ScheduledPost.findById(id);
+      if (!post) {
+        return res.status(404).json({ error: "Scheduled post not found" });
+      }
+
+      // Check ownership
+      if (String(post.accountId) !== String(userId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Don't allow editing if already released
+      if (post.isReleased) {
+        return res.status(400).json({ error: "Cannot edit a released post" });
+      }
+
+      const { content, scheduledDate, isAnonymous, community } = req.body;
+
+      if (content !== undefined) post.content = content;
+      if (scheduledDate !== undefined) {
+        const scheduledDateObj = new Date(scheduledDate);
+        if (isNaN(scheduledDateObj.getTime())) {
+          return res
+            .status(400)
+            .json({ error: "Invalid scheduledDate format" });
+        }
+        if (scheduledDateObj <= new Date()) {
+          return res
+            .status(400)
+            .json({ error: "scheduledDate must be in the future" });
+        }
+        post.scheduledDate = scheduledDateObj;
+      }
+      if (isAnonymous !== undefined) {
+        post.isAnonymous = isAnonymous === "true" || isAnonymous === true;
+      }
+      if (community !== undefined) {
+        post.community =
+          community && mongoose.Types.ObjectId.isValid(community)
+            ? new mongoose.Types.ObjectId(community)
+            : null;
+      }
+
+      // Update images if provided
+      if (req.files && req.files.length > 0) {
+        const images = [];
+        for (const file of req.files) {
+          images.push({
+            filename: file.originalname,
+            contentType: file.mimetype,
+            data: bufferToBase64(file.buffer, file.mimetype),
+            size: file.size,
+          });
+        }
+        post.images = images;
+      }
+
+      await post.save();
+
+      // Fetch author information
+      let author = {
+        name: "Anonymous",
+        username: String(userId),
+        avatarUrl: null,
+      };
+
+      try {
+        const user = await User.findById(userId).select(
+          "username profile.full_name profile.avatar"
+        );
+        if (user) {
+          author = {
+            name: user.profile?.full_name || user.username || "Anonymous",
+            username: user.username,
+            avatarUrl: user.profile?.avatar || null,
+          };
+        }
+      } catch (userError) {
+        console.error("Error fetching user for scheduled post:", userError);
+      }
+
+      res.json({
+        _id: String(post._id),
+        id: String(post._id),
+        accountId: post.accountId,
+        content: post.content,
+        images: post.images.map(
+          (_, idx) => `/scheduled-posts/image/${post._id}/${idx}`
+        ),
+        scheduledDate: post.scheduledDate,
+        isReleased: post.isReleased,
+        likes: post.likesCount,
+        comments: post.commentsCount,
+        fundingTotal: post.fundingTotal || 0,
+        fundingCount: post.fundingCount || 0,
+        isAnonymous: post.isAnonymous || false,
+        community: post.community || null,
+        createdAt: post.createdAt,
+        author: author,
+      });
+    } catch (err) {
+      console.error("scheduled-posts PUT error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
+);
 
 /* ============================================================
    ✅ DELETE /scheduled-posts/:id
@@ -479,4 +523,3 @@ router.get("/image/:id/:index", async (req, res) => {
 });
 
 export default router;
-

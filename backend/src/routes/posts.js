@@ -297,6 +297,27 @@ router.get("/recommended", authenticateToken, async (req, res) => {
           recommendedPosts = [...recommendedPosts, ...recentPosts];
         }
 
+        // Mix in active advertisements (30% of recommendations, prioritized)
+        const Advertisement = (await import("../models/Advertisement.js"))
+          .default;
+        const adLimit = Math.floor(limit * 0.3);
+        const allActiveAds = await Advertisement.find({
+          isActive: true,
+          type: "post",
+        })
+          .populate("postId")
+          .sort({ createdAt: -1 })
+          .lean();
+
+        // Filter ads with budget remaining and valid posts
+        const activeAds = allActiveAds.filter(
+          (ad) => ad.postId && !ad.postId.isAnonymous && ad.spent < ad.budget
+        );
+
+        const advertisementPosts = activeAds
+          .slice(0, adLimit)
+          .map((ad) => ad.postId);
+
         // Mix in anonymous posts randomly (20% of recommendations)
         const anonymousLimit = Math.floor(limit * 0.2);
         const anonymousPosts = await Post.find({
@@ -307,14 +328,40 @@ router.get("/recommended", authenticateToken, async (req, res) => {
           .limit(anonymousLimit)
           .lean();
 
-        // Combine recommended and anonymous posts
-        const allRecommendedPosts = [...recommendedPosts, ...anonymousPosts];
+        // Combine: advertisements first (they're paid), then recommended, then anonymous
+        const allRecommendedPosts = [
+          ...advertisementPosts,
+          ...recommendedPosts,
+          ...anonymousPosts,
+        ];
 
-        // Shuffle to mix anonymous posts randomly
-        allRecommendedPosts.sort(() => Math.random() - 0.5);
+        // Shuffle but keep advertisements distributed (every 3-4 posts)
+        const shuffled = [];
+        const adInterval = 3;
+        let adIndex = 0;
+        let regularIndex = advertisementPosts.length;
+
+        for (
+          let i = 0;
+          i < allRecommendedPosts.length && shuffled.length < limit;
+          i++
+        ) {
+          if (i % adInterval === 0 && adIndex < advertisementPosts.length) {
+            shuffled.push(advertisementPosts[adIndex++]);
+          } else if (regularIndex < allRecommendedPosts.length) {
+            shuffled.push(allRecommendedPosts[regularIndex++]);
+          }
+        }
+
+        // Fill remaining with shuffled posts
+        const remaining = allRecommendedPosts.filter(
+          (p) => !shuffled.includes(p)
+        );
+        remaining.sort(() => Math.random() - 0.5);
+        shuffled.push(...remaining);
 
         // Limit to requested amount
-        const finalRecommendedPosts = allRecommendedPosts.slice(0, limit);
+        const finalRecommendedPosts = shuffled.slice(0, limit);
 
         // Convert images to URL references
         return finalRecommendedPosts.map((p) => ({
@@ -330,6 +377,8 @@ router.get("/recommended", authenticateToken, async (req, res) => {
           fundingTotal: p.fundingTotal || 0,
           fundingCount: p.fundingCount || 0,
           isAnonymous: p.isAnonymous || false,
+          isAdvertisement: p.isAdvertisement || false,
+          advertisementTargetUrl: p.advertisementTargetUrl || "",
           createdAt: p.createdAt,
         }));
       },
@@ -343,7 +392,7 @@ router.get("/recommended", authenticateToken, async (req, res) => {
   }
 });
 
-// POST /posts (multipart/form-data) fields: content, images[], optional community
+// POST /posts (multipart/form-data) fields: content, images[], optional community, isAdvertisement, advertisementTargetUrl, advertisementBudget
 router.post(
   "/",
   authenticateToken,
@@ -351,25 +400,69 @@ router.post(
   async (req, res) => {
     try {
       const accountId = String(req.user._id);
+      const userRole = req.user.role;
       const content = String(req.body.content || "").slice(0, 5000);
       const isAnonymous =
         req.body.isAnonymous === "true" || req.body.isAnonymous === true;
       const community = mongoose.Types.ObjectId.isValid(req.body.community)
         ? req.body.community
         : null;
+
+      // Advertisement fields (only for enterprise accounts)
+      const isAdvertisement =
+        userRole === "enterprise" &&
+        (req.body.isAdvertisement === "true" ||
+          req.body.isAdvertisement === true);
+      const advertisementTargetUrl = isAdvertisement
+        ? String(req.body.advertisementTargetUrl || "")
+        : "";
+      const advertisementBudget = isAdvertisement
+        ? Math.round(parseFloat(req.body.advertisementBudget || 0) * 100)
+        : 0; // Convert to cents
+
       const images = (req.files || []).map((f) => ({
         filename: f.originalname,
         contentType: f.mimetype,
         data: f.buffer.toString("base64"),
         size: f.size,
       }));
+
       const post = await Post.create({
         accountId,
         content,
         images,
         isAnonymous,
         community,
+        isAdvertisement,
+        advertisementTargetUrl,
+        advertisementBudget,
+        advertisementSpent: 0,
+        advertisementViews: 0,
+        advertisementClicks: 0,
+        advertisementReactions: 0,
       });
+
+      // Create Advertisement record if this is an ad
+      if (isAdvertisement) {
+        const Advertisement = (await import("../models/Advertisement.js"))
+          .default;
+        await Advertisement.create({
+          userId: accountId,
+          postId: post._id,
+          type: "post",
+          targetUrl: advertisementTargetUrl,
+          budget: advertisementBudget,
+          spent: 0,
+          views: 0,
+          clicks: 0,
+          reactions: 0,
+          isActive: true,
+          startDate: new Date(),
+        });
+        console.log(
+          `[Advertisement] Created advertisement post ${post._id} with budget ${advertisementBudget} cents`
+        );
+      }
 
       // 🚀 Publish event to Kafka for async processing
       // This makes the response instant - notifications are processed in the background

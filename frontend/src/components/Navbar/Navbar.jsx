@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { FloatingNav } from "../ui/floating-navbar.jsx";
 import SearchUsers from "../SearchUsers";
 import LanguageSwitcher from "../ui/LanguageSwitcher.jsx";
-import { IconHome, IconUser, IconLogin, IconDatabase, IconLogout, IconCompass, IconVideo, IconBell } from "@tabler/icons-react";
+import { IconHome, IconUser, IconLogin, IconDatabase, IconLogout, IconCompass, IconVideo, IconBell, IconUsers } from "@tabler/icons-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePostNotifications } from "../../hooks/usePostNotifications";
 
@@ -19,9 +19,7 @@ const Navbar = () => {
     { name: t("common.home"), link: "/", icon: <IconHome size={18} /> },
     ...(isAuthenticated() ? [{ name: "Discover", link: "/discover", icon: <IconCompass size={18} /> }] : []),
     ...(isAuthenticated() ? [{ name: "Video Chat", link: "/video-chat", icon: <IconVideo size={18} /> }] : []),
-    { name: t("common.about"), link: "/about", icon: <IconDatabase size={18} /> },
-    { name: t("common.courses"), link: "/courses", icon: <IconDatabase size={18} /> },
-    { name: t("common.challenges"), link: "/challenges", icon: <IconDatabase size={18} /> },
+    { name: "Communities", link: "/communities", icon: <IconUsers size={18} /> },
     { name: t("common.reels"), link: "/reels", icon: <IconDatabase size={18} /> },
     { name: t("common.classroom"), link: "/vr", icon: <IconDatabase size={18} /> },
   ];

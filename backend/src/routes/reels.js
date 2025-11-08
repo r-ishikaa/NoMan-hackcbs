@@ -412,6 +412,19 @@ CRITICAL: Return ONLY the JSON object, nothing else.`;
         .filter((t) => t.length > 3),
     ].slice(0, 5);
 
+    // Advertisement fields (only for enterprise accounts)
+    const userRole = req.user?.role || "user";
+    const isAdvertisement =
+      userRole === "enterprise" &&
+      (req.body.isAdvertisement === "true" ||
+        req.body.isAdvertisement === true);
+    const advertisementTargetUrl = isAdvertisement
+      ? String(req.body.advertisementTargetUrl || "")
+      : "";
+    const advertisementBudget = isAdvertisement
+      ? Math.round(parseFloat(req.body.advertisementBudget || 0) * 100)
+      : 0; // Convert to cents
+
     // Save reel to database
     const reelDoc = await Reel.create({
       title: reelData.title,
@@ -432,7 +445,37 @@ CRITICAL: Return ONLY the JSON object, nothing else.`;
       prompt: topic,
       tags,
       createdBy: req.user?._id || null,
+      author: req.user?._id || null,
+      isAdvertisement,
+      advertisementTargetUrl,
+      advertisementBudget,
+      advertisementSpent: 0,
+      advertisementViews: 0,
+      advertisementClicks: 0,
+      advertisementReactions: 0,
     });
+
+    // Create Advertisement record if this is an ad
+    if (isAdvertisement) {
+      const Advertisement = (await import("../models/Advertisement.js"))
+        .default;
+      await Advertisement.create({
+        userId: String(req.user._id),
+        reelId: reelDoc._id,
+        type: "reel",
+        targetUrl: advertisementTargetUrl,
+        budget: advertisementBudget,
+        spent: 0,
+        views: 0,
+        clicks: 0,
+        reactions: 0,
+        isActive: true,
+        startDate: new Date(),
+      });
+      console.log(
+        `[Advertisement] Created advertisement reel ${reelDoc._id} with budget ${advertisementBudget} cents`
+      );
+    }
 
     // Return complete reel data with ID
     res.json({
@@ -509,6 +552,19 @@ router.post(
           .json({ error: "Title and video file are required" });
       }
 
+      // Advertisement fields (only for enterprise accounts)
+      const userRole = req.user.role || "user";
+      const isAdvertisement =
+        userRole === "enterprise" &&
+        (req.body.isAdvertisement === "true" ||
+          req.body.isAdvertisement === true);
+      const advertisementTargetUrl = isAdvertisement
+        ? String(req.body.advertisementTargetUrl || "")
+        : "";
+      const advertisementBudget = isAdvertisement
+        ? Math.round(parseFloat(req.body.advertisementBudget || 0) * 100)
+        : 0; // Convert to cents
+
       // Create reel record
       const reel = new Reel({
         title: title.trim(),
@@ -520,14 +576,44 @@ router.post(
         size: req.file.size,
         duration: 0, // Will be calculated client-side or later
         author: userId,
+        createdBy: userId,
         isPublished: true,
         viewCount: 0,
         likeCount: 0,
         scenes: [], // No scenes for uploaded videos
         totalDuration: 0,
+        isAdvertisement,
+        advertisementTargetUrl,
+        advertisementBudget,
+        advertisementSpent: 0,
+        advertisementViews: 0,
+        advertisementClicks: 0,
+        advertisementReactions: 0,
       });
 
       await reel.save();
+
+      // Create Advertisement record if this is an ad
+      if (isAdvertisement) {
+        const Advertisement = (await import("../models/Advertisement.js"))
+          .default;
+        await Advertisement.create({
+          userId: String(userId),
+          reelId: reel._id,
+          type: "reel",
+          targetUrl: advertisementTargetUrl,
+          budget: advertisementBudget,
+          spent: 0,
+          views: 0,
+          clicks: 0,
+          reactions: 0,
+          isActive: true,
+          startDate: new Date(),
+        });
+        console.log(
+          `[Advertisement] Created advertisement reel ${reel._id} with budget ${advertisementBudget} cents`
+        );
+      }
 
       // Populate author info
       await reel.populate(
@@ -541,12 +627,18 @@ router.post(
         // Get the uploader's username
         const uploader = await User.findById(authorId).select("username");
         const username = uploader?.username || "Someone";
-        
-        const followers = await Follow.find({ followingId: authorId }).select("followerId");
-        console.log(`[Reel Notification] User ${authorId} (${username}) uploaded reel. Found ${followers.length} followers.`);
-        
+
+        const followers = await Follow.find({ followingId: authorId }).select(
+          "followerId"
+        );
+        console.log(
+          `[Reel Notification] User ${authorId} (${username}) uploaded reel. Found ${followers.length} followers.`
+        );
+
         if (followers.length === 0) {
-          console.log(`[Reel Notification] No followers found for user ${authorId}`);
+          console.log(
+            `[Reel Notification] No followers found for user ${authorId}`
+          );
         } else {
           const bulk = followers.map((f) => ({
             recipientId: String(f.followerId),
@@ -557,31 +649,44 @@ router.post(
             relatedReelId: String(reel._id),
             relatedPostId: "",
           }));
-          
+
           try {
-            const notifications = await Notification.insertMany(bulk, { ordered: false });
-            console.log(`[Reel Notification] Created ${notifications.length} notifications in database.`);
-            
+            const notifications = await Notification.insertMany(bulk, {
+              ordered: false,
+            });
+            console.log(
+              `[Reel Notification] Created ${notifications.length} notifications in database.`
+            );
+
             // Send notifications via WebSocket and web push
             for (let i = 0; i < followers.length; i++) {
               const followerId = String(followers[i].followerId);
               const notification = notifications[i];
-              
+
               if (!notification) {
-                console.warn(`[Reel Notification] No notification found for follower ${followerId} at index ${i}`);
+                console.warn(
+                  `[Reel Notification] No notification found for follower ${followerId} at index ${i}`
+                );
                 continue;
               }
-              
+
               // Send via WebSocket (real-time)
               try {
                 // Convert Mongoose document to plain object for WebSocket
-                const notificationObj = notification.toObject ? notification.toObject() : notification;
+                const notificationObj = notification.toObject
+                  ? notification.toObject()
+                  : notification;
                 broadcastNotification(followerId, notificationObj);
-                console.log(`[Reel Notification] Sent WebSocket notification to user ${followerId}`);
+                console.log(
+                  `[Reel Notification] Sent WebSocket notification to user ${followerId}`
+                );
               } catch (wsError) {
-                console.error(`[Reel Notification] WebSocket error for user ${followerId}:`, wsError);
+                console.error(
+                  `[Reel Notification] WebSocket error for user ${followerId}:`,
+                  wsError
+                );
               }
-              
+
               // Send web push notification
               sendPushNotification(followerId, {
                 title: "New Reel",
@@ -593,27 +698,46 @@ router.post(
                   reelId: String(reel._id),
                 },
               }).catch((err) => {
-                console.error(`[Reel Notification] Push notification error for user ${followerId}:`, err);
+                console.error(
+                  `[Reel Notification] Push notification error for user ${followerId}:`,
+                  err
+                );
               });
             }
           } catch (insertError) {
-            console.error("[Reel Notification] Error inserting notifications:", insertError);
+            console.error(
+              "[Reel Notification] Error inserting notifications:",
+              insertError
+            );
             // If bulk insert fails, try inserting one by one
-            console.log("[Reel Notification] Attempting individual notification insertion...");
+            console.log(
+              "[Reel Notification] Attempting individual notification insertion..."
+            );
             for (const notifData of bulk) {
               try {
                 const notif = await Notification.create(notifData);
                 const followerId = notifData.recipientId;
-                broadcastNotification(followerId, notif.toObject ? notif.toObject() : notif);
-                console.log(`[Reel Notification] Created and sent notification to user ${followerId}`);
+                broadcastNotification(
+                  followerId,
+                  notif.toObject ? notif.toObject() : notif
+                );
+                console.log(
+                  `[Reel Notification] Created and sent notification to user ${followerId}`
+                );
               } catch (individualError) {
-                console.error(`[Reel Notification] Failed to create notification for ${notifData.recipientId}:`, individualError);
+                console.error(
+                  `[Reel Notification] Failed to create notification for ${notifData.recipientId}:`,
+                  individualError
+                );
               }
             }
           }
         }
       } catch (e) {
-        console.error("[Reel Notification] notify followers error:", e?.message || e);
+        console.error(
+          "[Reel Notification] notify followers error:",
+          e?.message || e
+        );
         console.error("[Reel Notification] Stack trace:", e?.stack);
       }
 
@@ -868,7 +992,7 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
     let interaction = await ReelInteraction.findOne({ reelId: id, userId });
 
     const wasLikedBefore = interaction?.liked || false;
-    
+
     if (!interaction) {
       interaction = await ReelInteraction.create({
         reelId: id,
@@ -893,12 +1017,17 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
     }
 
     // Send notification if this is a new like (wasn't liked before, now is liked)
-    if (!wasLikedBefore && interaction.liked && String(reel.author) !== userId) {
+    if (
+      !wasLikedBefore &&
+      interaction.liked &&
+      String(reel.author) !== userId
+    ) {
       try {
-        const Notification = (await import("../models/Notification.js")).default;
+        const Notification = (await import("../models/Notification.js"))
+          .default;
         const liker = await User.findById(userId).select("username");
         const username = liker?.username || "Someone";
-        
+
         const notification = await Notification.create({
           recipientId: String(reel.author),
           type: "like",
@@ -908,11 +1037,16 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
           relatedReelId: String(id),
           relatedPostId: "",
         });
-        
+
         // Send via WebSocket
-        const { broadcastNotification } = await import("../utils/notificationBroadcaster.js");
-        broadcastNotification(String(reel.author), notification.toObject ? notification.toObject() : notification);
-        
+        const { broadcastNotification } = await import(
+          "../utils/notificationBroadcaster.js"
+        );
+        broadcastNotification(
+          String(reel.author),
+          notification.toObject ? notification.toObject() : notification
+        );
+
         // Send web push notification
         const { sendPushNotification } = await import("./push.js");
         sendPushNotification(String(reel.author), {
@@ -925,10 +1059,15 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
             reelId: String(id),
           },
         }).catch((err) => {
-          console.error(`[Reel Like Notification] Push notification error:`, err);
+          console.error(
+            `[Reel Like Notification] Push notification error:`,
+            err
+          );
         });
-        
-        console.log(`[Reel Like Notification] Sent notification to reel author ${reel.author}`);
+
+        console.log(
+          `[Reel Like Notification] Sent notification to reel author ${reel.author}`
+        );
       } catch (notifErr) {
         console.error("[Reel Like Notification] Error:", notifErr);
       }

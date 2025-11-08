@@ -63,6 +63,15 @@ const ReelSchema = new mongoose.Schema(
     // Status
     isPublished: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false },
+
+    // Advertisement fields
+    isAdvertisement: { type: Boolean, default: false, index: true },
+    advertisementViews: { type: Number, default: 0 },
+    advertisementClicks: { type: Number, default: 0 },
+    advertisementReactions: { type: Number, default: 0 }, // Likes + comments
+    advertisementTargetUrl: { type: String, default: "" }, // URL to redirect on click
+    advertisementBudget: { type: Number, default: 0 }, // Budget in cents
+    advertisementSpent: { type: Number, default: 0 }, // Amount spent in cents
   },
   { timestamps: true }
 );
@@ -74,5 +83,6 @@ ReelSchema.index({ likeCount: -1 });
 ReelSchema.index({ topic: 1 });
 ReelSchema.index({ tags: 1 });
 ReelSchema.index({ isPublished: 1, isDeleted: 1 });
+ReelSchema.index({ isAdvertisement: 1, createdAt: -1 });
 
 export default mongoose.model("Reel", ReelSchema);

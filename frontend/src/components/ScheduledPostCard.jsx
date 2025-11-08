@@ -1,141 +1,110 @@
-import React from 'react'
-import { IconLock, IconCalendar } from '@tabler/icons-react'
-import PostCard from './PostCard'
+import { useState, useEffect } from 'react'
+import { Clock, Lock } from 'lucide-react'
 
-export default function ScheduledPostCard({ 
-  post, 
-  authorName, 
-  authorUsername, 
-  authorAvatarUrl, 
-  authorAccountId,
-  viewerAccountId,
-  canDelete,
-  onDelete 
-}) {
-  const isReleased = post.isReleased || new Date(post.scheduledDate) <= new Date()
-  const scheduledDate = new Date(post.scheduledDate)
-  const now = new Date()
-  const timeUntilRelease = scheduledDate - now
+export default function ScheduledPostCard({ post, authorName, authorUsername, authorAvatarUrl }) {
+  const [timeRemaining, setTimeRemaining] = useState(post.timeUntilRelease || 0)
+  const [timeString, setTimeString] = useState('')
 
-  // Use post.author if available, otherwise use props
-  const displayName = authorName || post.author?.name || 'Anonymous'
-  const displayUsername = authorUsername || post.author?.username || 'anonymous'
-  const displayAvatar = authorAvatarUrl || post.author?.avatarUrl || null
+  useEffect(() => {
+    if (!post.timeUntilRelease || post.isReleased) return
 
-  // Format time until release
-  const formatTimeUntilRelease = () => {
-    if (timeUntilRelease <= 0) return 'Released'
-    
-    const days = Math.floor(timeUntilRelease / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((timeUntilRelease % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    const minutes = Math.floor((timeUntilRelease % (1000 * 60 * 60)) / (1000 * 60))
-    
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''}`
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`
-    return `${minutes} minute${minutes > 1 ? 's' : ''}`
-  }
+    const updateTime = () => {
+      const now = Date.now()
+      const scheduledTime = new Date(post.scheduledDate).getTime()
+      const remaining = Math.max(0, scheduledTime - now)
+      setTimeRemaining(remaining)
 
-  if (isReleased) {
-    // Show full post if released
-    return (
-      <PostCard
-        post={post}
-        authorName={authorName}
-        authorUsername={authorUsername}
-        authorAvatarUrl={authorAvatarUrl}
-        authorAccountId={authorAccountId}
-        viewerAccountId={viewerAccountId}
-        canDelete={canDelete}
-        onDelete={onDelete}
-      />
-    )
-  }
+      if (remaining <= 0) {
+        setTimeString('Revealed!')
+        return
+      }
 
-  // Show blurred preview if not released
+      // Calculate time units
+      const days = Math.floor(remaining / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000)
+
+      // Format time string
+      if (days > 0) {
+        setTimeString(`${days}d ${hours}h ${minutes}m`)
+      } else if (hours > 0) {
+        setTimeString(`${hours}h ${minutes}m ${seconds}s`)
+      } else if (minutes > 0) {
+        setTimeString(`${minutes}m ${seconds}s`)
+      } else {
+        setTimeString(`${seconds}s`)
+      }
+    }
+
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+
+    return () => clearInterval(interval)
+  }, [post.timeUntilRelease, post.scheduledDate, post.isReleased])
+
   return (
-    <div className="relative rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
-      {/* Author Info - Always Visible (Not Blurred) */}
-      <div className="relative z-30 p-4 flex items-center gap-3 border-b border-zinc-100 bg-white">
-        <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center overflow-hidden">
-          {displayAvatar ? (
-            <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-zinc-500 text-sm font-semibold">
-              {displayName?.charAt(0)?.toUpperCase() || '?'}
+    <div className="bg-white rounded-xl shadow-md border-2 border-violet-200 hover:border-violet-300 transition-all p-6">
+      {/* Author Info */}
+      <div className="flex items-center gap-3 mb-4">
+        {authorAvatarUrl ? (
+          <img
+            src={authorAvatarUrl}
+            alt={authorName}
+            className="w-10 h-10 rounded-full object-cover border-2 border-violet-200"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center border-2 border-violet-200">
+            <span className="text-violet-600 font-bold text-sm">
+              {authorName?.[0]?.toUpperCase() || authorUsername?.[0]?.toUpperCase() || 'U'}
             </span>
-          )}
-        </div>
-        <div>
-          <div className="font-semibold text-zinc-900">{displayName}</div>
-          <div className="text-xs text-zinc-500">@{displayUsername}</div>
-        </div>
-        {/* Delete button for owner (if not released) */}
-        {canDelete && onDelete && (
-          <button
-            onClick={onDelete}
-            className="ml-auto p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-colors"
-            title="Delete scheduled post"
-          >
-            <svg className="w-4 h-4 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          </div>
         )}
-      </div>
-
-      {/* Content Area with Overlay */}
-      <div className="relative min-h-[200px]">
-        {/* Blurred Content */}
-        <div className="relative blur-sm pointer-events-none select-none">
-          {/* Content - Blurred */}
-          <div className="p-4">
-            {post.content && (
-              <p className="text-zinc-900 whitespace-pre-wrap break-words mb-3">
-                {post.content}
-              </p>
-            )}
-            {post.images && post.images.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {post.images.slice(0, 4).map((img, idx) => (
-                  <div key={idx} className="aspect-square bg-zinc-200 rounded-lg overflow-hidden">
-                    <img src={img} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            )}
-            {!post.content && (!post.images || post.images.length === 0) && (
-              <div className="p-8 text-center text-zinc-400">
-                No content
-              </div>
-            )}
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-zinc-900">{authorName || authorUsername}</p>
+            <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-bold rounded-full flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Scheduled
+            </span>
           </div>
-        </div>
-
-        {/* Overlay with Lock Icon and Release Info - Only covers content area */}
-        <div className="absolute inset-0 bg-white/85 backdrop-blur-sm flex flex-col items-center justify-center p-6">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center">
-              <IconLock className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-zinc-900 mb-1">Time Capsule Locked</div>
-              <div className="text-sm text-zinc-600 mb-3">
-                This post will be released on
-              </div>
-              <div className="flex items-center gap-2 text-zinc-900 font-medium justify-center">
-                <IconCalendar className="w-5 h-5" />
-                <span>{scheduledDate.toLocaleString()}</span>
-              </div>
-              {timeUntilRelease > 0 && (
-                <div className="mt-2 text-xs text-zinc-500">
-                  In {formatTimeUntilRelease()}
-                </div>
-              )}
-            </div>
-          </div>
+          <p className="text-xs text-zinc-500">@{authorUsername}</p>
         </div>
       </div>
+
+      {/* Hidden Content Placeholder */}
+      <div className="relative bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg p-8 border-2 border-dashed border-violet-300">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-violet-600" />
+          </div>
+          <h3 className="text-lg font-bold text-violet-900 mb-2">Scheduled Post</h3>
+          <p className="text-sm text-violet-700 mb-4">
+            This post will be revealed in:
+          </p>
+          <div className="bg-white rounded-lg px-6 py-3 shadow-lg border-2 border-violet-200">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-violet-600" />
+              <span className="text-2xl font-bold text-violet-900">{timeString || 'Calculating...'}</span>
+            </div>
+          </div>
+          <p className="text-xs text-violet-600 mt-4">
+            Scheduled for {new Date(post.scheduledDate).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Post Stats (if any) */}
+      {(post.likes > 0 || post.comments > 0) && (
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-100">
+          <span className="text-sm text-zinc-500">
+            {post.likes} {post.likes === 1 ? 'like' : 'likes'}
+          </span>
+          <span className="text-sm text-zinc-500">
+            {post.comments} {post.comments === 1 ? 'comment' : 'comments'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
-

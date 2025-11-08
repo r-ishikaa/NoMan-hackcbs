@@ -17,6 +17,8 @@ import WalletConnect from '../WalletConnect'
 import { communityData } from '../../data/CommunityData'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import TimeCapsuleComposer from '../TimeCapsuleComposer'
+import ScheduledPostCard from '../ScheduledPostCard'
 
 function authHeaders() {
   const token =
@@ -36,6 +38,7 @@ const Profile = () => {
   const [communityPosts, setCommunityPosts] = useState([])
   const [communitiesMap, setCommunitiesMap] = useState(new Map())
   const [reels, setReels] = useState([])
+  const [scheduledPosts, setScheduledPosts] = useState([])
   const [isFollowing, setIsFollowing] = useState(false)
   const [activeTab, setActiveTab] = useState('posts') // 'posts' or 'reels'
   const [postsSubTab, setPostsSubTab] = useState('myPosts') // 'myPosts' or 'community'
@@ -272,6 +275,33 @@ const Profile = () => {
         }))
         setReels(normalizedReels)
         setCounts(prev => ({ ...prev, reels: normalizedReels.length }))
+        // Fetch scheduled posts
+        const scheduledRes = await fetch(API_CONFIG.getApiUrl(`/scheduled-posts?accountId=${encodeURIComponent(accountId)}`), {
+          headers: authHeaders()
+        })
+        const scheduledData = scheduledRes.ok ? await scheduledRes.json() : []
+        const normalizedScheduled = (Array.isArray(scheduledData) ? scheduledData : []).map((p) => {
+          // Use author info from backend response, which should have username
+          const author = p.author || {
+            name: profile?.displayName || "Anonymous",
+            username: profile?.username || profile?.accountId || accountId || "anonymous",
+            avatarUrl: profile?.avatarUrl || null,
+          };
+          return {
+            id: p.id || p._id,
+            accountId: p.accountId,
+            content: p.content,
+            image: null,
+            images: (p.images || []).map((u) => API_CONFIG.getApiUrl(u)),
+            scheduledDate: p.scheduledDate,
+            isReleased: p.isReleased || false,
+            likes: Number(p.likes || p.likesCount || 0),
+            comments: Number(p.comments || p.commentsCount || 0),
+            timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
+            author: author,
+          };
+        })
+        setScheduledPosts(normalizedScheduled)
       } catch {
         setProfile(null)
       } finally {
@@ -306,6 +336,8 @@ const Profile = () => {
       </div>
     )
   }
+  
+
 
   const isSelf = meId && profile?.accountId === meId
   const currentScene =
@@ -553,6 +585,25 @@ const Profile = () => {
                   </span>
                 </div>
                 {activeTab === 'reels' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-full"></div>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('timeCapsule')}
+                className={`flex-1 px-6 py-4 font-semibold text-sm transition-all relative ${
+                  activeTab === 'timeCapsule' 
+                    ? 'text-zinc-900 bg-white' 
+                    : 'text-zinc-500 hover:text-zinc-700 hover:bg-white/50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <IconClock className="h-5 w-5" />
+                  <span>Time Capsule</span>
+                  <span className="ml-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-xs font-bold">
+                    {scheduledPosts.length}
+                  </span>
+                </div>
+                {activeTab === 'timeCapsule' && (
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-full"></div>
                 )}
               </button>
@@ -898,6 +949,92 @@ const Profile = () => {
                       <p className="text-zinc-600 font-semibold text-lg mb-2">No reels yet</p>
                       {isSelf && (
                         <p className="text-sm text-zinc-500">Create your first reel to get started!</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Time Capsule Section */}
+              {activeTab === 'timeCapsule' && (
+                <div>
+                  {/* Time Capsule Composer */}
+                  {isSelf && (
+                    <div className="mb-6">
+                      <TimeCapsuleComposer onCreated={async (newPost) => {
+                        // Refetch scheduled posts to get updated data
+                        try {
+                          const accountId = profile?.accountId;
+                          if (!accountId) return;
+                          
+                          const scheduledRes = await fetch(API_CONFIG.getApiUrl(`/scheduled-posts?accountId=${encodeURIComponent(accountId)}`), {
+                            headers: authHeaders()
+                          })
+                          const scheduledData = scheduledRes.ok ? await scheduledRes.json() : []
+                          const normalizedScheduled = (Array.isArray(scheduledData) ? scheduledData : []).map((p) => {
+                            const author = p.author || {
+                              name: profile?.displayName || "Anonymous",
+                              username: profile?.accountId || accountId,
+                              avatarUrl: profile?.avatarUrl || null,
+                            };
+                            return {
+                              id: p.id || p._id,
+                              accountId: p.accountId,
+                              content: p.content,
+                              image: null,
+                              images: (p.images || []).map((u) => API_CONFIG.getApiUrl(u)),
+                              scheduledDate: p.scheduledDate,
+                              isReleased: p.isReleased || false,
+                              likes: Number(p.likes || p.likesCount || 0),
+                              comments: Number(p.comments || p.commentsCount || 0),
+                              timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
+                              author: author,
+                            };
+                          })
+                          setScheduledPosts(normalizedScheduled)
+                        } catch (error) {
+                          console.error('Failed to refresh scheduled posts:', error)
+                          // Fallback: add the post with basic info
+                          setScheduledPosts((arr) => [newPost, ...arr])
+                        }
+                      }} />
+                    </div>
+                  )}
+
+                  {/* Scheduled Posts List */}
+                  {scheduledPosts.length > 0 ? (
+                    <div className="space-y-4">
+                      {scheduledPosts.map((p) => (
+                        <ScheduledPostCard
+                          key={p.id}
+                          post={p}
+                          authorName={p.author?.name || profile?.displayName}
+                          authorUsername={p.author?.username || profile?.accountId}
+                          authorAvatarUrl={p.author?.avatarUrl || profile?.avatarUrl}
+                          authorAccountId={p.accountId}
+                          viewerAccountId={meId}
+                          canDelete={isSelf && p.accountId === meId}
+                          onDelete={async () => {
+                            try {
+                              const res = await fetch(API_CONFIG.getApiUrl(`/scheduled-posts/${encodeURIComponent(p.id)}`), {
+                                method: 'DELETE',
+                                headers: authHeaders(),
+                              })
+                              if (res.ok) {
+                                setScheduledPosts((arr) => arr.filter((x) => x.id !== p.id))
+                              }
+                            } catch {}
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20">
+                      <div className="w-20 h-20 mx-auto mb-4 bg-zinc-100 rounded-2xl flex items-center justify-center">
+                        <IconClock className="h-10 w-10 text-zinc-400" />
+                      </div>
+                      <p className="text-zinc-600 font-semibold text-lg mb-2">No time capsules yet</p>
+                      {isSelf && (
+                        <p className="text-sm text-zinc-500">Schedule a post to create your first time capsule!</p>
                       )}
                     </div>
                   )}

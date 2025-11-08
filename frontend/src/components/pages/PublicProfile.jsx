@@ -10,6 +10,7 @@ import {
   IconVideo as Video
 } from '@tabler/icons-react'
 import PostCard from '../PostCard'
+import ScheduledPostCard from '../ScheduledPostCard'
 import { communityData } from '../../data/CommunityData'
 import { Link } from 'react-router-dom'
 
@@ -42,6 +43,7 @@ export default function PublicProfile() {
   const [counts, setCounts] = useState({ followers: 0, following: 0, reels: 0 })
   const [posts, setPosts] = useState([])
   const [communityPosts, setCommunityPosts] = useState([])
+  const [scheduledPosts, setScheduledPosts] = useState([])
   const [communitiesMap, setCommunitiesMap] = useState(new Map())
   const [reels, setReels] = useState([])
   const [isFollowing, setIsFollowing] = useState(false)
@@ -186,6 +188,39 @@ export default function PublicProfile() {
           } catch (error) {
             console.error('Failed to fetch communities:', error)
           }
+        }
+
+        // Fetch scheduled posts
+        try {
+          const scheduledRes = await fetch(API_CONFIG.getApiUrl(`/scheduled-posts?accountId=${encodeURIComponent(profileAccountId)}`))
+          if (scheduledRes.ok) {
+            const fetchedScheduled = await scheduledRes.json()
+            const normalizedScheduled = (Array.isArray(fetchedScheduled) ? fetchedScheduled : []).map((p) => ({
+              id: p.id || p._id,
+              accountId: p.accountId,
+              content: p.isReleased ? p.content : "", // Hidden if not released
+              images: p.isReleased ? (p.images || []).map((u) => API_CONFIG.getApiUrl(u)) : [], // Hidden if not released
+              scheduledDate: p.scheduledDate,
+              isReleased: p.isReleased,
+              releasedAt: p.releasedAt,
+              timeUntilRelease: p.timeUntilRelease || (p.isReleased ? null : Math.max(0, new Date(p.scheduledDate).getTime() - Date.now())),
+              likes: Number(p.likes || p.likesCount || 0),
+              comments: Number(p.comments || p.commentsCount || 0),
+              timestamp: new Date(p.createdAt || Date.now()).toLocaleString(),
+              community: p.community || null,
+              author: p.author || {
+                name: profile?.displayName || "Anonymous",
+                username: profile?.accountId || profileAccountId,
+                avatarUrl: profile?.avatarUrl || null,
+              },
+              isScheduled: true,
+            }))
+            if (!cancelled) {
+              setScheduledPosts(normalizedScheduled.filter(p => !p.isReleased)) // Only show unreleased scheduled posts
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch scheduled posts:', error)
         }
 
         const reelsRes = await fetch(API_CONFIG.getApiUrl('/reels'), { headers: authHeaders() })
@@ -448,7 +483,7 @@ export default function PublicProfile() {
                   <Grid className="h-5 w-5" />
                   <span>Posts</span>
                   <span className="ml-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-xs font-bold">
-                    {posts.length}
+                    {posts.length + scheduledPosts.length}
                   </span>
                 </div>
                 {activeTab === 'posts' && (
@@ -513,6 +548,18 @@ export default function PublicProfile() {
               
               {activeTab === 'posts' && postsSubTab === 'myPosts' && (
                 <div className="space-y-4">
+                  {/* Scheduled Posts */}
+                  {scheduledPosts.length > 0 && scheduledPosts.map((p) => (
+                    <ScheduledPostCard
+                      key={`scheduled-${p.id}`}
+                      post={p}
+                      authorName={p.author?.name || profile?.displayName}
+                      authorUsername={p.author?.username || profile?.accountId}
+                      authorAvatarUrl={p.author?.avatarUrl || profile?.avatarUrl}
+                    />
+                  ))}
+                  
+                  {/* Regular Posts */}
                   {posts.length > 0 ? (
                     posts.map((p) => (
                       <PostCard
@@ -525,14 +572,14 @@ export default function PublicProfile() {
                         viewerAccountId={meId}
                       />
                     ))
-                  ) : (
+                  ) : scheduledPosts.length === 0 ? (
                     <div className="text-center py-20">
                       <div className="w-20 h-20 mx-auto mb-4 bg-zinc-100 rounded-2xl flex items-center justify-center">
                         <Grid className="h-10 w-10 text-zinc-400" />
                       </div>
                       <p className="text-zinc-600 font-semibold text-lg mb-2">No posts yet</p>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
               

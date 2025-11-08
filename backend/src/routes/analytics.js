@@ -6,6 +6,7 @@ import Reel from "../models/Reel.js";
 import Like from "../models/Like.js";
 import Comment from "../models/Comment.js";
 import Follow from "../models/Follow.js";
+import Advertisement from "../models/Advertisement.js";
 
 const router = express.Router();
 
@@ -48,7 +49,9 @@ router.get(
           $or: [{ author: userId }, { createdBy: userId }],
           isPublished: true,
           isDeleted: false,
-        }).select("_id").lean(),
+        })
+          .select("_id")
+          .lean(),
       ]);
 
       const postIds = postDocs.map((p) => String(p._id));
@@ -121,13 +124,62 @@ router.get(
           : 0;
       const totalCommentsReceived = commentsOnPosts + commentsOnReels;
 
+      // Get advertisement analytics (enterprise only)
+      let advertisementStats = null;
+      if (req.user.role === "enterprise") {
+        const advertisements = await Advertisement.find({
+          userId,
+          createdAt: { $gte: startDate, $lte: endDate },
+        }).lean();
+
+        const totalAdViews = advertisements.reduce(
+          (sum, ad) => sum + (ad.views || 0),
+          0
+        );
+        const totalAdClicks = advertisements.reduce(
+          (sum, ad) => sum + (ad.clicks || 0),
+          0
+        );
+        const totalAdReactions = advertisements.reduce(
+          (sum, ad) => sum + (ad.reactions || 0),
+          0
+        );
+        const totalAdBudget = advertisements.reduce(
+          (sum, ad) => sum + (ad.budget || 0),
+          0
+        );
+        const totalAdSpent = advertisements.reduce(
+          (sum, ad) => sum + (ad.spent || 0),
+          0
+        );
+        const activeAds = advertisements.filter((ad) => ad.isActive).length;
+
+        advertisementStats = {
+          totalAds: advertisements.length,
+          activeAds,
+          totalViews: totalAdViews,
+          totalClicks: totalAdClicks,
+          totalReactions: totalAdReactions,
+          totalBudget: totalAdBudget,
+          totalSpent: totalAdSpent,
+          remainingBudget: totalAdBudget - totalAdSpent,
+          clickThroughRate:
+            totalAdViews > 0 ? (totalAdClicks / totalAdViews) * 100 : 0,
+          costPerView: totalAdViews > 0 ? totalAdSpent / totalAdViews : 0,
+          costPerClick: totalAdClicks > 0 ? totalAdSpent / totalAdClicks : 0,
+        };
+      }
+
       // Get total views (reels only, posts don't have view tracking)
       const reels = await Reel.find({
         $or: [{ author: userId }, { createdBy: userId }],
         isPublished: true,
         isDeleted: false,
       }).select("viewCount");
-      const totalViews = reels.reduce((sum, reel) => sum + (reel.viewCount || 0), 0);
+      const totalViews = reels.reduce(
+        (sum, reel) => sum + (reel.viewCount || 0),
+        0
+      );
 
       // Get recent activity (last 7 days)
       const recentStartDate = new Date();
@@ -199,6 +251,7 @@ router.get(
           totalComments: totalCommentsReceived,
           totalFollowers,
           totalFollowing,
+          ...(advertisementStats && { advertisements: advertisementStats }),
         },
         recent: {
           posts: recentPosts,
@@ -232,9 +285,9 @@ router.get(
       const { startDate, endDate } = getDateRange(parseInt(days));
 
       // Get post IDs and reel IDs
-      const postIds = (await Post.find({ accountId: userId }).select("_id")).map(
-        (p) => String(p._id)
-      );
+      const postIds = (
+        await Post.find({ accountId: userId }).select("_id")
+      ).map((p) => String(p._id));
       const reelIds = (
         await Reel.find({
           $or: [{ author: userId }, { createdBy: userId }],
@@ -407,7 +460,9 @@ router.get(
         createdAt: post.createdAt,
         likes: likesMap[String(post._id)] || 0,
         comments: commentsMap[String(post._id)] || 0,
-        engagement: (likesMap[String(post._id)] || 0) + (commentsMap[String(post._id)] || 0) * 2,
+        engagement:
+          (likesMap[String(post._id)] || 0) +
+          (commentsMap[String(post._id)] || 0) * 2,
       }));
 
       // Sort by engagement
@@ -471,7 +526,10 @@ router.get(
         views: reel.viewCount || 0,
         likes: likesMap[String(reel._id)] || 0,
         comments: commentsMap[String(reel._id)] || 0,
-        engagement: (reel.viewCount || 0) * 0.1 + (likesMap[String(reel._id)] || 0) + (commentsMap[String(reel._id)] || 0) * 2,
+        engagement:
+          (reel.viewCount || 0) * 0.1 +
+          (likesMap[String(reel._id)] || 0) +
+          (commentsMap[String(reel._id)] || 0) * 2,
       }));
 
       // Sort by engagement
@@ -489,4 +547,3 @@ router.get(
 );
 
 export default router;
-

@@ -94,6 +94,62 @@ router.post("/", authenticateToken, async (req, res) => {
       }
     }
 
+    // Track advertisement reaction if this is an ad
+    if (isNewLike) {
+      try {
+        const Advertisement = (await import("../models/Advertisement.js"))
+          .default;
+        const Post = (await import("../models/Post.js")).default;
+        const Reel = (await import("../models/Reel.js")).default;
+
+        // Find advertisement
+        const advertisement = await Advertisement.findOne({
+          [targetType === "post" ? "postId" : "reelId"]: targetId,
+          isActive: true,
+        });
+
+        if (advertisement) {
+          // Update reaction count
+          advertisement.reactions += 1;
+
+          // Calculate cost for this reaction (5 cents per reaction)
+          const costPerReaction = 5;
+          const newSpent = advertisement.spent + costPerReaction;
+
+          // Check if budget is exceeded
+          if (newSpent > advertisement.budget) {
+            advertisement.isActive = false;
+          } else {
+            advertisement.spent = newSpent;
+          }
+          await advertisement.save();
+
+          // Update Post/Reel advertisement reactions
+          if (targetType === "post") {
+            await Post.findByIdAndUpdate(targetId, {
+              $inc: {
+                advertisementReactions: 1,
+                advertisementSpent: costPerReaction,
+              },
+            });
+          } else {
+            await Reel.findByIdAndUpdate(targetId, {
+              $inc: {
+                advertisementReactions: 1,
+                advertisementSpent: costPerReaction,
+              },
+            });
+          }
+
+          console.log(
+            `[Advertisement] Tracked reaction for ${targetType} ${targetId}, total reactions: ${advertisement.reactions}`
+          );
+        }
+      } catch (adError) {
+        console.error("Advertisement reaction tracking error:", adError);
+      }
+    }
+
     // Send notification if this is a new like
     if (isNewLike) {
       try {

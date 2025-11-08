@@ -26,6 +26,14 @@ const PostSchema = new mongoose.Schema(
       required: false, // make it optional so old posts don't break
       index: true,
     },
+    // Advertisement fields
+    isAdvertisement: { type: Boolean, default: false, index: true },
+    advertisementViews: { type: Number, default: 0 },
+    advertisementClicks: { type: Number, default: 0 },
+    advertisementReactions: { type: Number, default: 0 }, // Likes + comments
+    advertisementTargetUrl: { type: String, default: "" }, // URL to redirect on click
+    advertisementBudget: { type: Number, default: 0 }, // Budget in cents
+    advertisementSpent: { type: Number, default: 0 }, // Amount spent in cents
   },
   { timestamps: true }
 );
@@ -33,6 +41,8 @@ const PostSchema = new mongoose.Schema(
 PostSchema.index({ createdAt: -1 });
 PostSchema.index({ isAnonymous: 1, createdAt: -1 });
 PostSchema.index({ accountId: 1, isAnonymous: 1 });
+PostSchema.index({ isAdvertisement: 1, createdAt: -1 });
+PostSchema.index({ accountId: 1, isAdvertisement: 1 });
 
 const Post = mongoose.models.Post || mongoose.model("Post", PostSchema);
 export default Post;

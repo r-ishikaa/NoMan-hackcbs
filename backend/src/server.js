@@ -9,7 +9,7 @@ import MongoStore from "connect-mongo";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import os from "os";
-
+import scheduledPostsRoutes from "./routes/ScheduledPost.js";
 // Import routes
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
@@ -32,6 +32,7 @@ import paymentsRoutes from "./routes/payments.js";
 import communityRoutes from "./routes/communities.js";
 import periodRoutes from "./routes/periods.js";
 import collaborationRoutes from "./routes/collaborations.js";
+import advertisementsRoutes from "./routes/advertisements.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
@@ -290,7 +291,8 @@ app.use("/payments", paymentsRoutes);
 app.use("/api/communities", communityRoutes);
 app.use("/api/periods", periodRoutes);
 app.use("/api/collaborations", collaborationRoutes);
-
+app.use("/advertisements", advertisementsRoutes);
+app.use("/scheduled-posts", scheduledPostsRoutes);
 // Health check endpoint
 app.get("/", (req, res) => {
   res.json({
@@ -364,6 +366,24 @@ const startServer = async () => {
       console.warn("[Kafka] Failed to start analytics consumer:", err.message);
     });
   }
+
+  // Start scheduled posts release checker (runs every minute)
+  const ScheduledPost = (await import("./models/ScheduledPost.js")).default;
+  setInterval(async () => {
+    try {
+      const result = await ScheduledPost.checkAndRelease();
+      if (result.released > 0) {
+        console.log(
+          `[ScheduledPost] Released ${result.released} scheduled posts`
+        );
+      }
+    } catch (error) {
+      console.error("[ScheduledPost] Error in periodic release check:", error);
+    }
+  }, 60000); // Check every minute
+  console.log(
+    "[ScheduledPost] ✅ Started periodic release checker (runs every minute)"
+  );
 
   // Listen on all interfaces (0.0.0.0) to allow network connections
   httpServer.listen(PORT, "0.0.0.0", () => {
