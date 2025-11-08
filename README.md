@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="./Logo.png" alt="Hexagon Logo" width="100" style="border-radius: 50%; display: block; margin: 0 auto;"/>
-</p>
 
 
 <div align="center">
