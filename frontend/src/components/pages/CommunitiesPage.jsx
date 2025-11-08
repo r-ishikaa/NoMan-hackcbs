@@ -32,20 +32,22 @@ const CommunitiesPage = () => {
   const [error, setError] = useState("");
 
   // Fetch communities from backend
-  useEffect(() => {
-    const fetchCommunities = async () => {
-      try {
-        const res = await fetch(API_CONFIG.getApiUrl('/api/communities'));
-        if (res.ok) {
-          const data = await res.json();
-          setCommunities(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch communities:', err);
-      } finally {
-        setLoading(false);
+  const fetchCommunities = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(API_CONFIG.getApiUrl('/api/communities'));
+      if (res.ok) {
+        const data = await res.json();
+        setCommunities(Array.isArray(data) ? data : []);
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch communities:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCommunities();
   }, []);
 
@@ -132,7 +134,8 @@ const CommunitiesPage = () => {
 
       if (res.ok) {
         const newCommunity = await res.json();
-        setCommunities((prev) => [...prev, newCommunity]);
+        // Refresh communities list from server to ensure all users see new communities
+        await fetchCommunities();
         setShowCreateModal(false);
         setFormData({ name: "", description: "", image: "", tags: "" });
         // Navigate to the new community using the slug

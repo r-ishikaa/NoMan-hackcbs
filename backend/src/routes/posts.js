@@ -16,20 +16,17 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024, files: 6 },
 });
 
-// GET /posts?accountId=<id>&community=<id>
-// Note: When fetching by accountId, anonymous posts are EXCLUDED from public view
+/* ============================================================
+   ✅ GET /posts 
+   Supports optional filters: accountId, community
+============================================================ */
 router.get("/", async (req, res) => {
   try {
     const { accountId, community } = req.query;
-    const filter = {};
 
-    if (accountId) {
-      // When fetching posts for a specific user's profile (public view)
-      // EXCLUDE anonymous posts - they should not appear in public profile
-      filter.accountId = String(accountId);
-      filter.isAnonymous = { $ne: true }; // Only show non-anonymous posts
-    }
-    
+    // Build filters dynamically
+    const filter = {};
+    if (accountId) filter.accountId = String(accountId);
     if (community) {
       // Support both ObjectId strings and regular strings
       filter.community = mongoose.Types.ObjectId.isValid(community) 
