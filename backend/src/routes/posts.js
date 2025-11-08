@@ -17,17 +17,26 @@ const upload = multer({
 });
 
 // GET /posts?accountId=<id>
+// Note: When fetching by accountId, anonymous posts are EXCLUDED from public view
 router.get("/", async (req, res) => {
   try {
     const { accountId } = req.query;
     const filter = {};
-    if (accountId) filter.accountId = String(accountId);
+
+    if (accountId) {
+      // When fetching posts for a specific user's profile (public view)
+      // EXCLUDE anonymous posts - they should not appear in public profile
+      filter.accountId = String(accountId);
+      filter.isAnonymous = { $ne: true }; // Only show non-anonymous posts
+    }
+
     const posts = await Post.find(filter).sort({ createdAt: -1 }).limit(100);
+
     // Convert images to URL references
     const mapped = posts.map((p) => ({
       _id: String(p._id),
       id: String(p._id),
-      accountId: p.isAnonymous ? null : p.accountId, // Hide accountId for anonymous posts
+      accountId: p.accountId,
       content: p.content,
       images: (p.images || []).map((_, idx) => `/posts/image/${p._id}/${idx}`),
       likes: p.likesCount,
@@ -59,9 +68,10 @@ router.get("/following", authenticateToken, async (req, res) => {
       return res.json([]);
     }
 
-    // Get posts from followed users
+    // Get posts from followed users (exclude their anonymous posts)
     const posts = await Post.find({
       accountId: { $in: followingIds },
+      isAnonymous: { $ne: true }, // Don't show anonymous posts in following feed
     })
       .sort({ createdAt: -1 })
       .limit(100);

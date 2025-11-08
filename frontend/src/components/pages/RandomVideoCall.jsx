@@ -15,9 +15,10 @@ export default function RandomVideoCall() {
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
+  const currentRoomIdRef = useRef(''); // ✅ Use ref for immediate access
   
   // State
-  const [status, setStatus] = useState('idle'); // idle, searching, waiting, connected
+  const [status, setStatus] = useState('idle');
   const [partnerUsername, setPartnerUsername] = useState('');
   const [roomId, setRoomId] = useState('');
   const [videoEnabled, setVideoEnabled] = useState(true);
@@ -26,7 +27,6 @@ export default function RandomVideoCall() {
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [checkingPermissions, setCheckingPermissions] = useState(false);
 
-  // ICE servers configuration (STUN servers for NAT traversal)
   const iceServers = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -34,7 +34,11 @@ export default function RandomVideoCall() {
     ],
   };
 
-  // Initialize socket connection
+  // ✅ Update ref when roomId changes
+  useEffect(() => {
+    currentRoomIdRef.current = roomId;
+  }, [roomId]);
+
   useEffect(() => {
     if (!isAuthenticated() || !token) {
       navigate('/login');
@@ -60,24 +64,36 @@ export default function RandomVideoCall() {
     });
 
     socket.on('matched', async ({ roomId: newRoomId, partnerUsername: partner, isInitiator }) => {
-      console.log(`[Video Call] Matched with ${partner}, initiator: ${isInitiator}`);
-      setStatus('connected');
+      console.log(`[Video Call] Matched with ${partner}, initiator: ${isInitiator}, room: ${newRoomId}`);
+      
+      // ✅ Set state and ref immediately
       setRoomId(newRoomId);
+      currentRoomIdRef.current = newRoomId;
       setPartnerUsername(partner);
+      setStatus('connected');
 
-      // If initiator, create and send offer
+      // ✅ Pass roomId directly instead of using state
       if (isInitiator) {
         await createOffer(newRoomId);
       }
     });
 
-    socket.on('offer', async ({ offer, fromUsername }) => {
-      console.log(`[Video Call] Received offer from ${fromUsername}`);
-      await handleOffer(offer);
+    // ✅ Receive roomId from server
+    socket.on('offer', async ({ offer, fromUsername, roomId: receivedRoomId }) => {
+      console.log(`[Video Call] Received offer from ${fromUsername} in room ${receivedRoomId}`);
+      
+      // ✅ Update roomId if not set
+      if (!currentRoomIdRef.current && receivedRoomId) {
+        setRoomId(receivedRoomId);
+        currentRoomIdRef.current = receivedRoomId;
+      }
+      
+      await handleOffer(offer, receivedRoomId || currentRoomIdRef.current);
     });
 
-    socket.on('answer', async ({ answer }) => {
-      console.log('[Video Call] Received answer');
+    // ✅ Receive roomId from server
+    socket.on('answer', async ({ answer, roomId: receivedRoomId }) => {
+      console.log(`[Video Call] Received answer in room ${receivedRoomId}`);
       await handleAnswer(answer);
     });
 
@@ -88,18 +104,18 @@ export default function RandomVideoCall() {
 
     socket.on('partnerSkipped', () => {
       console.log('[Video Call] Partner skipped');
+      cleanupCall();
       setStatus('idle');
       setPartnerUsername('');
-      cleanupCall();
       setError('Partner skipped to next match');
       setTimeout(() => setError(''), 3000);
     });
 
     socket.on('partnerDisconnected', () => {
       console.log('[Video Call] Partner disconnected');
+      cleanupCall();
       setStatus('idle');
       setPartnerUsername('');
-      cleanupCall();
       setError('Partner disconnected');
       setTimeout(() => setError(''), 3000);
     });
@@ -117,7 +133,6 @@ export default function RandomVideoCall() {
     };
   }, [token, isAuthenticated, navigate]);
 
-  // Check and request permissions
   const requestPermissions = async () => {
     setCheckingPermissions(true);
     setError('');
@@ -137,14 +152,11 @@ export default function RandomVideoCall() {
         }
       });
       
-      console.log('[Video Call] Media stream obtained:', stream.getTracks().map(t => t.kind));
-      
+      console.log('[Video Call] Media stream obtained');
       localStreamRef.current = stream;
       
-      // Wait for video element to be ready
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        // Force video to play
         try {
           await localVideoRef.current.play();
           console.log('[Video Call] Local video playing');
@@ -155,7 +167,6 @@ export default function RandomVideoCall() {
       
       setPermissionsGranted(true);
       setCheckingPermissions(false);
-      console.log('[Video Call] Permissions granted successfully');
       return stream;
     } catch (err) {
       console.error('[Video Call] Error accessing media devices:', err);
@@ -166,7 +177,7 @@ export default function RandomVideoCall() {
       } else if (err.name === 'NotFoundError') {
         setError('No camera or microphone found. Please connect a device.');
       } else if (err.name === 'NotReadableError') {
-        setError('Camera is already in use by another application. Please close other apps using the camera.');
+        setError('Camera is already in use by another application.');
       } else {
         setError(`Could not access camera/microphone: ${err.message}`);
       }
@@ -174,7 +185,6 @@ export default function RandomVideoCall() {
     }
   };
 
-  // Get local media stream (reuse if already granted)
   const getLocalStream = async () => {
     if (localStreamRef.current) {
       return localStreamRef.current;
@@ -182,136 +192,156 @@ export default function RandomVideoCall() {
     return await requestPermissions();
   };
 
-  // Create peer connection
-  const createPeerConnection = (newRoomId) => {
+  // ✅ Accept roomId as parameter
+  const createPeerConnection = (roomIdParam) => {
+    // ✅ Close existing connection first
+    if (peerConnectionRef.current) {
+      console.log('[Video Call] Closing existing peer connection');
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
     const pc = new RTCPeerConnection(iceServers);
     peerConnectionRef.current = pc;
 
-    // Add local stream tracks to peer connection
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current);
+        console.log('[Video Call] Added local track:', track.kind);
       });
     }
 
-    // Handle incoming remote stream
     pc.ontrack = (event) => {
-      console.log('[Video Call] Received remote track');
-      if (remoteVideoRef.current) {
+      console.log('[Video Call] Received remote track:', event.track.kind);
+      if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
     };
 
-    // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current) {
         console.log('[Video Call] Sending ICE candidate');
         socketRef.current.emit('ice-candidate', {
           candidate: event.candidate,
-          roomId: newRoomId,
+          roomId: roomIdParam || currentRoomIdRef.current,
         });
       }
     };
 
-    // Handle connection state changes
     pc.onconnectionstatechange = () => {
       console.log('[Video Call] Connection state:', pc.connectionState);
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+      if (pc.connectionState === 'failed') {
+        setError('Connection failed. Try skipping to next person.');
+      } else if (pc.connectionState === 'disconnected') {
         setError('Connection lost');
       }
+    };
+
+    // ✅ Add ICE connection state logging
+    pc.oniceconnectionstatechange = () => {
+      console.log('[Video Call] ICE connection state:', pc.iceConnectionState);
     };
 
     return pc;
   };
 
-  // Create and send offer
-  const createOffer = async (newRoomId) => {
+  // ✅ Accept roomId as parameter
+  const createOffer = async (roomIdParam) => {
     try {
+      console.log('[Video Call] Creating offer for room:', roomIdParam);
       await getLocalStream();
-      const pc = createPeerConnection(newRoomId);
       
-      const offer = await pc.createOffer();
+      const pc = createPeerConnection(roomIdParam);
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      
       await pc.setLocalDescription(offer);
       
       socketRef.current.emit('offer', {
         offer,
-        roomId: newRoomId,
+        roomId: roomIdParam,
       });
       
-      console.log('[Video Call] Offer sent');
+      console.log('[Video Call] Offer sent for room:', roomIdParam);
     } catch (err) {
       console.error('[Video Call] Error creating offer:', err);
-      setError('Failed to start call');
+      setError('Failed to start call. Please try again.');
     }
   };
 
-  // Handle incoming offer
-  const handleOffer = async (offer) => {
+  // ✅ Accept roomId as parameter
+  const handleOffer = async (offer, roomIdParam) => {
     try {
+      console.log('[Video Call] Handling offer for room:', roomIdParam);
       await getLocalStream();
-      const pc = createPeerConnection(roomId);
       
+      const pc = createPeerConnection(roomIdParam);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       
       socketRef.current.emit('answer', {
         answer,
-        roomId,
+        roomId: roomIdParam,
       });
       
-      console.log('[Video Call] Answer sent');
+      console.log('[Video Call] Answer sent for room:', roomIdParam);
     } catch (err) {
       console.error('[Video Call] Error handling offer:', err);
-      setError('Failed to answer call');
+      setError('Failed to answer call. Please try again.');
     }
   };
 
-  // Handle incoming answer
   const handleAnswer = async (answer) => {
     try {
       if (peerConnectionRef.current) {
         await peerConnectionRef.current.setRemoteDescription(
           new RTCSessionDescription(answer)
         );
-        console.log('[Video Call] Answer processed');
+        console.log('[Video Call] Answer processed successfully');
       }
     } catch (err) {
       console.error('[Video Call] Error handling answer:', err);
+      setError('Failed to establish connection');
     }
   };
 
-  // Handle incoming ICE candidate
   const handleIceCandidate = async (candidate) => {
     try {
-      if (peerConnectionRef.current) {
+      if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
         await peerConnectionRef.current.addIceCandidate(
           new RTCIceCandidate(candidate)
         );
+        console.log('[Video Call] ICE candidate added');
       }
     } catch (err) {
       console.error('[Video Call] Error adding ICE candidate:', err);
     }
   };
 
-  // Cleanup call (but keep local stream for preview)
+  // ✅ Improved cleanup
   const cleanupCall = () => {
+    console.log('[Video Call] Cleaning up call');
+    
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
     
-    // Don't stop local stream - keep it for preview
-    // Just clear remote video
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
     
     setRoomId('');
+    currentRoomIdRef.current = '';
   };
 
-  // Complete cleanup (stops all streams)
   const completeCleanup = () => {
+    console.log('[Video Call] Complete cleanup');
+    
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
@@ -334,10 +364,10 @@ export default function RandomVideoCall() {
     }
     
     setRoomId('');
+    currentRoomIdRef.current = '';
     setPermissionsGranted(false);
   };
 
-  // Start searching for match
   const startSearch = () => {
     setError('');
     setStatus('searching');
@@ -346,52 +376,52 @@ export default function RandomVideoCall() {
     }
   };
 
-  // Stop searching
   const stopSearch = () => {
     if (socketRef.current) {
       socketRef.current.emit('stopSearching');
     }
     cleanupCall();
     setStatus('idle');
-    // Restart local stream preview
-    if (!localStreamRef.current && permissionsGranted) {
-      requestPermissions().catch(console.error);
-    }
   };
 
-  // Skip current match
+  // ✅ Improved skip logic
   const skipMatch = () => {
+    console.log('[Video Call] Skipping current match');
+    
     if (socketRef.current) {
       socketRef.current.emit('skip');
     }
+    
     cleanupCall();
     setStatus('searching');
-    // Auto find next match
+    setPartnerUsername('');
+    
+    // ✅ Small delay to prevent race conditions
     setTimeout(() => {
-      if (socketRef.current) {
+      if (socketRef.current && status !== 'idle') {
         socketRef.current.emit('findMatch');
       }
-    }, 500);
+    }, 300);
   };
 
-  // Toggle video
   const toggleVideo = () => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
+        console.log('[Video Call] Video toggled:', videoTrack.enabled);
       }
     }
   };
 
-  // Toggle audio
   const toggleAudio = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
+        console.log('[Video Call] Audio toggled:', audioTrack.enabled);
       }
     }
   };
@@ -399,13 +429,11 @@ export default function RandomVideoCall() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl">
-        {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 drop-shadow-lg">Random Video Chat</h1>
           <p className="text-gray-200 text-lg">Connect with random people around the world</p>
         </div>
 
-        {/* Permission Request */}
         {!permissionsGranted && status === 'idle' && (
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-6 border border-white/20 shadow-2xl">
             <div className="text-center">
@@ -427,17 +455,14 @@ export default function RandomVideoCall() {
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/50 rounded-2xl text-white text-center shadow-lg">
             <p className="font-medium">{error}</p>
           </div>
         )}
 
-        {/* Video Container */}
         {permissionsGranted && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {/* Remote Video */}
             <div className="relative aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
               <video
                 ref={remoteVideoRef}
@@ -485,7 +510,6 @@ export default function RandomVideoCall() {
               )}
             </div>
 
-            {/* Local Video */}
             <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
               <video
                 ref={localVideoRef}
@@ -493,8 +517,6 @@ export default function RandomVideoCall() {
                 playsInline
                 muted
                 className="w-full h-full object-cover mirror"
-                onLoadedMetadata={() => console.log('[Video Call] Local video metadata loaded')}
-                onPlay={() => console.log('[Video Call] Local video playing')}
               />
               <div className="absolute top-4 left-4 bg-gradient-to-r from-green-600/90 to-emerald-600/90 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg">
                 👤 You {!videoEnabled && '(Camera Off)'}
@@ -513,7 +535,6 @@ export default function RandomVideoCall() {
           </div>
         )}
 
-        {/* Controls */}
         {permissionsGranted && (
           <div className="flex justify-center gap-3 flex-wrap">
             {status === 'idle' && (
@@ -582,7 +603,6 @@ export default function RandomVideoCall() {
           </div>
         )}
 
-        {/* Instructions */}
         {permissionsGranted && (
           <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-white border border-white/20 shadow-lg">
             <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
@@ -623,4 +643,3 @@ export default function RandomVideoCall() {
     </div>
   );
 }
-

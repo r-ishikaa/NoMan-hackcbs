@@ -347,7 +347,10 @@ const Discover = () => {
         {!loading && allPosts.length > 0 && (
           <div className="space-y-4 flex flex-col items-center">
             {allPosts.map((post) => {
-              const profile = profiles[post.accountId] || {};
+              // For anonymous posts, don't fetch or show any profile info
+              const isAnonymous = post.isAnonymous === true || post.accountId === null;
+              const profile = isAnonymous ? {} : (profiles[post.accountId] || {});
+              
               // Convert image paths to full URLs
               const formattedPost = {
                 ...post,
@@ -361,17 +364,18 @@ const Discover = () => {
                   return API_CONFIG.getApiUrl(imgPath);
                 }),
               };
+              
               return (
                 <div key={post.id || post._id} className="w-full max-w-2xl">
-                <PostCard
+                  <PostCard
                     post={formattedPost}
-                  authorName={profile.displayName || profile.accountId}
-                  authorUsername={profile.accountId}
-                  authorAvatarUrl={profile.avatarUrl}
-                  authorAccountId={post.accountId}
-                  viewerAccountId={user?._id || user?.id}
-                  canDelete={false}
-                />
+                    authorName={isAnonymous ? 'Anonymous' : (profile.displayName || profile.accountId)}
+                    authorUsername={isAnonymous ? 'Anonymous' : profile.accountId}
+                    authorAvatarUrl={isAnonymous ? null : profile.avatarUrl}
+                    authorAccountId={isAnonymous ? null : post.accountId}
+                    viewerAccountId={user?._id || user?.id}
+                    canDelete={false}
+                  />
                 </div>
               );
             })}
