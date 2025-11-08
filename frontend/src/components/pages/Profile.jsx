@@ -6,7 +6,8 @@ import {
   IconCalendar as Calendar, 
   IconSparkles as Sparkles,
   IconGrid3x3 as Grid,
-  IconVideo as Video
+  IconVideo as Video,
+  IconClock as Clock
 } from '@tabler/icons-react'
 import PostCard from '../PostCard'
 import PostComposer from '../PostComposer'
@@ -597,7 +598,7 @@ const Profile = () => {
                 }`}
               >
                 <div className="flex items-center justify-center gap-2">
-                  <IconClock className="h-5 w-5" />
+                  <Clock className="h-5 w-5" />
                   <span>Time Capsule</span>
                   <span className="ml-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-xs font-bold">
                     {scheduledPosts.length}
@@ -1030,7 +1031,7 @@ const Profile = () => {
                   ) : (
                     <div className="text-center py-20">
                       <div className="w-20 h-20 mx-auto mb-4 bg-zinc-100 rounded-2xl flex items-center justify-center">
-                        <IconClock className="h-10 w-10 text-zinc-400" />
+                        <Clock className="h-10 w-10 text-zinc-400" />
                       </div>
                       <p className="text-zinc-600 font-semibold text-lg mb-2">No time capsules yet</p>
                       {isSelf && (

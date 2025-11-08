@@ -32,6 +32,25 @@ export default function PostCard({
   const [showFundingModal, setShowFundingModal] = useState(false)
   const [fundingStats, setFundingStats] = useState({ totalFunding: 0, fundingCount: 0 })
   const [loadingFunding, setLoadingFunding] = useState(false)
+  const isAdvertisement = post.isAdvertisement === true
+  const advertisementTargetUrl = post.advertisementTargetUrl || ''
+
+  // Track advertisement view when component mounts
+  useEffect(() => {
+    if (!isAdvertisement) return
+    
+    ;(async () => {
+      try {
+        // Track advertisement view
+        await fetch(
+          API_CONFIG.getApiUrl(`/advertisements/${post.id}/track/view?type=post`),
+          { method: 'POST', headers: authHeaders() }
+        )
+      } catch (error) {
+        console.error('Failed to track advertisement view:', error)
+      }
+    })()
+  }, [isAdvertisement, post.id])
 
   useEffect(() => {
     let cancelled = false
@@ -267,8 +286,39 @@ export default function PostCard({
   // Check if post is anonymous
   const isAnonymousPost = post.isAnonymous === true || post.accountId === null;
 
+  // Handle advertisement click
+  const handleAdvertisementClick = async () => {
+    if (!isAdvertisement || !advertisementTargetUrl) return
+    
+    try {
+      // Track advertisement click
+      const clickRes = await fetch(
+        API_CONFIG.getApiUrl(`/advertisements/${post.id}/track/click?type=post`),
+        { method: 'POST', headers: authHeaders() }
+      )
+      
+      if (clickRes.ok) {
+        const data = await clickRes.json()
+        // Open target URL in new tab
+        if (data.targetUrl) {
+          window.open(data.targetUrl, '_blank', 'noopener,noreferrer')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to track advertisement click:', error)
+      // Still open the URL even if tracking fails
+      if (advertisementTargetUrl) {
+        window.open(advertisementTargetUrl, '_blank', 'noopener,noreferrer')
+      }
+    }
+  }
+
   return (
-    <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-md">
+    <article className={`rounded-2xl border p-6 shadow-md ${
+      isAdvertisement 
+        ? 'border-2 border-violet-300 bg-gradient-to-br from-violet-50/50 to-purple-50/50' 
+        : 'border-zinc-200 bg-white'
+    }`}>
       <header className="mb-4 flex items-start gap-4">
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
           {isAnonymousPost ? (
@@ -284,6 +334,11 @@ export default function PostCard({
                 {isAnonymousPost ? 'Anonymous' : (authorName || authorUsername || 'User')}
               </span>
               <span className="text-sm text-gray-500">{post.timestamp}</span>
+              {isAdvertisement && (
+                <span className="text-xs bg-gradient-to-r from-violet-600 to-purple-600 text-white px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                  💰 Ad
+                </span>
+              )}
               {isAnonymousPost && (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Anonymous Post</span>
               )}
@@ -308,8 +363,21 @@ export default function PostCard({
               </button>
             )}
           </div>
-          <p className="mt-3 mb-2 text-[15px] leading-6 text-gray-800 whitespace-pre-line">{post.content}</p>
-          {renderImages()}
+          <div 
+            onClick={isAdvertisement ? handleAdvertisementClick : undefined}
+            className={isAdvertisement ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}
+          >
+            <p className="mt-3 mb-2 text-[15px] leading-6 text-gray-800 whitespace-pre-line">{post.content}</p>
+            {renderImages()}
+            {isAdvertisement && advertisementTargetUrl && (
+              <div className="mt-3 p-3 bg-gradient-to-r from-violet-100 to-purple-100 rounded-lg border border-violet-200">
+                <p className="text-sm text-violet-900 font-semibold flex items-center gap-2">
+                  <span>🔗</span>
+                  <span>Click to visit: {advertisementTargetUrl}</span>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

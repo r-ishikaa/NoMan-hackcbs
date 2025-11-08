@@ -273,6 +273,139 @@ router.get(
   }
 );
 
+// GET /analytics/heatmap - Get activity heatmap data for last 365 days
+router.get(
+  "/heatmap",
+  authenticateToken,
+  authorizeRoles("creator", "enterprise"),
+  async (req, res) => {
+    try {
+      const userId = String(req.user._id);
+
+      // Get data for last 365 days
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 365);
+      const endDate = new Date();
+
+      // Get post IDs and reel IDs
+      const postIds = (
+        await Post.find({ accountId: userId }).select("_id")
+      ).map((p) => String(p._id));
+      const reelIds = (
+        await Reel.find({
+          $or: [{ author: userId }, { createdBy: userId }],
+        }).select("_id")
+      ).map((r) => String(r._id));
+
+      // Get all activities in the date range
+      const [posts, reels, likes, comments] = await Promise.all([
+        Post.find({
+          accountId: userId,
+          createdAt: { $gte: startDate, $lte: endDate },
+        }).select("createdAt"),
+
+        Reel.find({
+          $or: [{ author: userId }, { createdBy: userId }],
+          isPublished: true,
+          isDeleted: false,
+          createdAt: { $gte: startDate, $lte: endDate },
+        }).select("createdAt"),
+
+        postIds.length > 0 || reelIds.length > 0
+          ? Like.find({
+              $or: [
+                ...(postIds.length > 0
+                  ? [{ targetType: "post", targetId: { $in: postIds } }]
+                  : []),
+                ...(reelIds.length > 0
+                  ? [{ targetType: "reel", targetId: { $in: reelIds } }]
+                  : []),
+              ],
+              createdAt: { $gte: startDate, $lte: endDate },
+            }).select("createdAt")
+          : Promise.resolve([]),
+
+        postIds.length > 0 || reelIds.length > 0
+          ? Comment.find({
+              $or: [
+                ...(postIds.length > 0
+                  ? [{ targetType: "post", targetId: { $in: postIds } }]
+                  : []),
+                ...(reelIds.length > 0
+                  ? [{ targetType: "reel", targetId: { $in: reelIds } }]
+                  : []),
+              ],
+              createdAt: { $gte: startDate, $lte: endDate },
+            }).select("createdAt")
+          : Promise.resolve([]),
+      ]);
+
+      // Create activity map by date
+      const activityByDate = {};
+
+      // Count posts
+      posts.forEach((post) => {
+        const date = new Date(post.createdAt).toISOString().split("T")[0];
+        activityByDate[date] = (activityByDate[date] || 0) + 1;
+      });
+
+      // Count reels
+      reels.forEach((reel) => {
+        const date = new Date(reel.createdAt).toISOString().split("T")[0];
+        activityByDate[date] = (activityByDate[date] || 0) + 1;
+      });
+
+      // Count likes received
+      likes.forEach((like) => {
+        const date = new Date(like.createdAt).toISOString().split("T")[0];
+        activityByDate[date] = (activityByDate[date] || 0) + 1;
+      });
+
+      // Count comments received
+      comments.forEach((comment) => {
+        const date = new Date(comment.createdAt).toISOString().split("T")[0];
+        activityByDate[date] = (activityByDate[date] || 0) + 1;
+      });
+
+      // Generate array for all 365 days
+      const heatmapData = [];
+      for (let i = 364; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split("T")[0];
+        const count = activityByDate[dateStr] || 0;
+
+        heatmapData.push({
+          date: dateStr,
+          count: count,
+          level:
+            count === 0
+              ? 0
+              : count < 5
+              ? 1
+              : count < 10
+              ? 2
+              : count < 20
+              ? 3
+              : 4,
+        });
+      }
+
+      res.json({
+        heatmap: heatmapData,
+        totalDays: 365,
+        totalActivity: Object.values(activityByDate).reduce(
+          (sum, count) => sum + count,
+          0
+        ),
+      });
+    } catch (error) {
+      console.error("Analytics heatmap error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
 // GET /analytics/activity - Get activity data over time (for graphs)
 router.get(
   "/activity",
