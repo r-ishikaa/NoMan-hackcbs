@@ -264,21 +264,31 @@ export default function PostCard({
     )
   }
 
+  // Check if post is anonymous
+  const isAnonymousPost = post.isAnonymous === true || post.accountId === null;
+
   return (
     <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-md">
       <header className="mb-4 flex items-start gap-4">
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-purple-500 to-pink-500">
-          {authorAvatarUrl ? (
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+          {isAnonymousPost ? (
+            <span className="text-white text-lg">🎭</span>
+          ) : authorAvatarUrl ? (
             <img src={authorAvatarUrl} alt={authorName || authorUsername || 'avatar'} className="h-10 w-10 object-cover" />
           ) : null}
         </div>
         <div className="flex-1">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="font-semibold text-gray-900 text-[15px]">{authorName || authorUsername || 'User'}</span>
+              <span className="font-semibold text-gray-900 text-[15px]">
+                {isAnonymousPost ? 'Anonymous' : (authorName || authorUsername || 'User')}
+              </span>
               <span className="text-sm text-gray-500">{post.timestamp}</span>
+              {isAnonymousPost && (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Anonymous Post</span>
+              )}
             </div>
-            {authorAccountId && viewerAccountId && authorAccountId !== viewerAccountId && (
+            {!isAnonymousPost && authorAccountId && viewerAccountId && authorAccountId !== viewerAccountId && (
               <button
                 onClick={async () => {
                   try {

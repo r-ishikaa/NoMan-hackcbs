@@ -17,6 +17,7 @@ export default function PostComposer({ onCreated }) {
   const [courses, setCourses] = useState([])
   const [selectedCourseId, setSelectedCourseId] = useState('')
   const [assignmentName, setAssignmentName] = useState('')
+  const [isAnonymous, setIsAnonymous] = useState(false)
   const fileInputRef = useRef(null)
 
   const onPickFiles = (e) => {
@@ -37,6 +38,7 @@ export default function PostComposer({ onCreated }) {
       const fd = new FormData()
       const tags = `${selectedCourseId ? ` @course(${selectedCourseId})` : ''}${assignmentName.trim() ? ` @assignment(${assignmentName.trim()})` : ''}`
       fd.append('content', `${content.trim()}${tags}`.trim())
+      fd.append('isAnonymous', isAnonymous.toString())
       files.forEach((f) => fd.append('images', f))
       const res = await fetch(API_CONFIG.getApiUrl('/posts'), {
         method: 'POST',
@@ -50,6 +52,7 @@ export default function PostComposer({ onCreated }) {
         setFiles([])
         setSelectedCourseId('')
         setAssignmentName('')
+        setIsAnonymous(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
     } finally {
@@ -123,18 +126,37 @@ export default function PostComposer({ onCreated }) {
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onPickFiles} className="text-sm" />
-          <span className="text-xs text-zinc-500">Up to 6 images</span>
+      <div className="mt-4 flex flex-col gap-3">
+        {/* Anonymous Toggle */}
+        <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-200">
+          <label className="flex items-center gap-2 cursor-pointer flex-1">
+            <input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-zinc-900"
+            />
+            <span className="text-sm font-medium text-zinc-900">Post Anonymously</span>
+          </label>
+          <span className="text-xs text-zinc-500">
+            {isAnonymous ? '🎭 Your identity will be hidden' : '👤 Post as yourself'}
+          </span>
         </div>
-        <button
-          onClick={submit}
-          disabled={submitting || (!content.trim() && files.length === 0)}
-          className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {submitting ? 'Posting…' : 'Post'}
-        </button>
+
+        {/* Bottom Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onPickFiles} className="text-sm" />
+            <span className="text-xs text-zinc-500">Up to 6 images</span>
+          </div>
+          <button
+            onClick={submit}
+            disabled={submitting || (!content.trim() && files.length === 0)}
+            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 hover:bg-zinc-800 transition-colors"
+          >
+            {submitting ? 'Posting…' : isAnonymous ? 'Post Anonymously' : 'Post'}
+          </button>
+        </div>
       </div>
     </div>
   )

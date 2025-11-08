@@ -146,15 +146,25 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful logins
 });
 
-// General rate limiter for other routes (skips /auth routes)
+// General rate limiter for other routes (skips /auth routes and critical user endpoints)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Increased from 300 to 500 for general routes
+  max: isDevelopment ? 1000 : 500, // Very lenient in development
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for auth routes (they have their own limiter)
-    return req.path.startsWith("/auth");
+    // Skip rate limiting for:
+    // 1. Auth routes (they have their own limiter)
+    // 2. User profile endpoints (critical for app functionality)
+    // 3. Static assets
+    const skipPaths = [
+      "/auth",
+      "/users/me",
+      "/users/search",
+      "/profiles",
+      "/uploads",
+    ];
+    return skipPaths.some((path) => req.path.startsWith(path));
   },
 });
 
