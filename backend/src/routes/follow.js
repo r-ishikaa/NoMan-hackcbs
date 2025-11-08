@@ -6,6 +6,7 @@ import { authenticateToken } from "../middleware/auth.js";
 import { sendPushNotification } from "./push.js";
 import { broadcastNotification } from "../utils/notificationBroadcaster.js";
 import { cacheGet, cacheDel } from "../config/redis.js";
+import { publishEvent, KAFKA_TOPICS, EVENT_TYPES } from "../config/kafka.js";
 
 const router = express.Router();
 
@@ -77,74 +78,25 @@ router.post("/", authenticateToken, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    // Invalidate follow stats cache for both users
-    await Promise.all([
-      cacheDel(`follow:stats:${followerId}`),
-      cacheDel(`follow:stats:${followingId}`),
-    ]);
-
-    // Send notification to the user being followed
+    // 🚀 Publish event to Kafka for async processing
     try {
       const follower = await User.findById(followerId).select("username");
       const username = follower?.username || "Someone";
 
-      console.log(
-        `[Follow Notification] User ${followerId} (${username}) followed user ${followingId}`
-      );
-
-      const notification = await Notification.create({
-        recipientId: followingId,
-        type: "follow",
-        message: `${username} started following you.`,
-        relatedUserId: followerId,
-        relatedUsername: username,
-        relatedPostId: "",
-        relatedReelId: "",
+      await publishEvent(KAFKA_TOPICS.USER_EVENTS, {
+        eventType: EVENT_TYPES.USER_FOLLOWED,
+        followerId: followerId,
+        followingId: followingId,
+        username: username,
+        timestamp: Date.now(),
       });
 
-      console.log(
-        `[Follow Notification] Created notification in database: ${notification._id}`
+      console.log(`[Kafka] ✅ Published USER_FOLLOWED event`);
+    } catch (kafkaError) {
+      console.error(
+        "[Kafka] Failed to publish USER_FOLLOWED event:",
+        kafkaError
       );
-
-      // Send via WebSocket (real-time)
-      try {
-        broadcastNotification(
-          followingId,
-          notification.toObject ? notification.toObject() : notification
-        );
-        console.log(
-          `[Follow Notification] Sent WebSocket notification to user ${followingId}`
-        );
-      } catch (wsError) {
-        console.error(
-          `[Follow Notification] WebSocket error for user ${followingId}:`,
-          wsError
-        );
-      }
-
-      // Send web push notification
-      try {
-        await sendPushNotification(followingId, {
-          title: "New Follower",
-          body: `${username} started following you.`,
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
-          data: {
-            url: `/profile/${followerId}`,
-            userId: followerId,
-          },
-        });
-        console.log(
-          `[Follow Notification] Sent push notification to user ${followingId}`
-        );
-      } catch (pushErr) {
-        console.error(
-          `[Follow Notification] Push notification error for user ${followingId}:`,
-          pushErr
-        );
-      }
-    } catch (notifErr) {
-      console.error("[Follow Notification] Error:", notifErr);
     }
 
     res.status(201).json({ ok: true });

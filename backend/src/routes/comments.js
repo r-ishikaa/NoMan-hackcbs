@@ -2,6 +2,7 @@ import express from "express";
 import Comment from "../models/Comment.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { cacheGet, cacheDel } from "../config/redis.js";
+import { publishEvent, KAFKA_TOPICS, EVENT_TYPES } from "../config/kafka.js";
 
 const router = express.Router();
 
@@ -64,6 +65,19 @@ router.post("/", authenticateToken, async (req, res) => {
 
     // Invalidate comment count cache
     await cacheDel(`comments:count:${targetType}:${targetId}`);
+
+    // 🚀 Publish analytics event to Kafka
+    try {
+      await publishEvent(KAFKA_TOPICS.ENGAGEMENT_EVENTS, {
+        eventType: EVENT_TYPES.COMMENT_CREATED,
+        userId: accountId,
+        targetType: targetType,
+        targetId: targetId,
+        timestamp: Date.now(),
+      });
+    } catch (kafkaError) {
+      console.error("[Kafka] Failed to publish COMMENT event:", kafkaError);
+    }
 
     // Send notification for comments
     try {

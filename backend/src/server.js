@@ -35,6 +35,9 @@ import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
 import { initRedis, closeRedis } from "./config/redis.js";
+import { initKafkaProducer, closeKafka } from "./config/kafka.js";
+import { notificationConsumer } from "./services/notificationConsumer.js";
+import { analyticsConsumer } from "./services/analyticsConsumer.js";
 
 // Load environment variables
 dotenv.config();
@@ -195,7 +198,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      mongoUrl: process.env.MONGO_URL || "mongodb://localhost:27017/hexagon",
+      mongoUrl:
+        process.env.MONGODB_URL ||
+        process.env.MONGO_URL ||
+        "mongodb://localhost:27017/hexagon",
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
@@ -208,10 +214,11 @@ app.use(
 // MongoDB connection
 const connectDB = async () => {
   try {
-    const mongoUrl = process.env.MONGO_URL;
+    // Prioritize MONGODB_URL (cloud) over MONGO_URL (local)
+    const mongoUrl = process.env.MONGODB_URL || process.env.MONGO_URL;
 
     if (!mongoUrl) {
-      console.error("MONGO_URL environment variable is not set");
+      console.error("MONGODB_URL or MONGO_URL environment variable is not set");
       process.exit(1);
     }
 
@@ -226,10 +233,17 @@ const connectDB = async () => {
     }
 
     console.log("🔗 Connecting to MongoDB...");
+    console.log(
+      `📍 Using: ${
+        mongoUrl.includes("mongodb+srv")
+          ? "Cloud MongoDB (Atlas)"
+          : "Local MongoDB"
+      }`
+    );
     await mongoose.connect(mongoUrl);
-    console.log("MongoDB connected successfully");
+    console.log("✅ MongoDB connected successfully");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error);
     process.exit(1);
   }
 };
@@ -315,6 +329,28 @@ const startServer = async () => {
     );
   });
 
+  // Initialize Kafka Producer (non-blocking - app works without Kafka)
+  initKafkaProducer().catch((err) => {
+    console.warn(
+      "[Kafka] Failed to connect producer, continuing without event streaming:",
+      err.message
+    );
+  });
+
+  // Start Kafka Consumers (non-blocking)
+  if (process.env.ENABLE_KAFKA_CONSUMERS !== "false") {
+    notificationConsumer.start().catch((err) => {
+      console.warn(
+        "[Kafka] Failed to start notification consumer:",
+        err.message
+      );
+    });
+
+    analyticsConsumer.start().catch((err) => {
+      console.warn("[Kafka] Failed to start analytics consumer:", err.message);
+    });
+  }
+
   // Listen on all interfaces (0.0.0.0) to allow network connections
   httpServer.listen(PORT, "0.0.0.0", () => {
     const localIP = getLocalIP();
@@ -338,6 +374,7 @@ if (!process.env.VERCEL) {
   process.on("SIGTERM", async () => {
     console.log("\n🛑 SIGTERM signal received: closing HTTP server");
     await closeRedis();
+    await closeKafka();
     httpServer.close(() => {
       console.log("✅ HTTP server closed");
       process.exit(0);
@@ -347,6 +384,7 @@ if (!process.env.VERCEL) {
   process.on("SIGINT", async () => {
     console.log("\n🛑 SIGINT signal received: closing HTTP server");
     await closeRedis();
+    await closeKafka();
     httpServer.close(() => {
       console.log("✅ HTTP server closed");
       process.exit(0);

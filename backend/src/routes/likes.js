@@ -2,6 +2,7 @@ import express from "express";
 import Like from "../models/Like.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { cacheGet, cacheDel, cacheIncr } from "../config/redis.js";
+import { publishEvent, KAFKA_TOPICS, EVENT_TYPES } from "../config/kafka.js";
 
 const router = express.Router();
 
@@ -74,6 +75,24 @@ router.post("/", authenticateToken, async (req, res) => {
       cacheDel(`likes:count:${targetType}:${targetId}`),
       cacheDel(`likes:count:${targetType}:${targetId}:${accountId}`),
     ]);
+
+    // 🚀 Publish analytics event to Kafka
+    if (isNewLike) {
+      try {
+        await publishEvent(KAFKA_TOPICS.ENGAGEMENT_EVENTS, {
+          eventType:
+            targetType === "post"
+              ? EVENT_TYPES.POST_LIKED
+              : EVENT_TYPES.REEL_LIKED,
+          userId: accountId,
+          targetType: targetType,
+          targetId: targetId,
+          timestamp: Date.now(),
+        });
+      } catch (kafkaError) {
+        console.error("[Kafka] Failed to publish LIKE event:", kafkaError);
+      }
+    }
 
     // Send notification if this is a new like
     if (isNewLike) {
