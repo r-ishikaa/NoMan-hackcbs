@@ -1,6 +1,8 @@
 import express from "express";
 import { body, validationResult } from "express-validator";
 import passport from "passport";
+import multer from "multer";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import User from "../models/User.js";
 import {
   generateToken,
@@ -9,6 +11,26 @@ import {
 } from "../middleware/auth.js";
 
 const router = express.Router();
+
+// Configure multer for image upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(
+  process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+);
 
 // Validation middleware
 const validateSignup = [
@@ -540,6 +562,112 @@ router.post("/auth0/exchange", async (req, res) => {
   } catch (error) {
     console.error("Auth0 exchange error:", error);
     res.status(500).json({ error: "Failed to exchange Auth0 token" });
+  }
+});
+
+// Gender verification endpoint using Gemini AI
+router.post("/verify-gender", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image provided" });
+    }
+
+    // Check if Gemini API key is configured
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY) {
+      console.error("Gemini API key not configured");
+      return res
+        .status(500)
+        .json({ error: "AI verification service not configured" });
+    }
+
+    console.log("[Gender Verification] Processing image...");
+
+    // Convert image buffer to base64
+    const imageBase64 = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype;
+
+    // Get Gemini model
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Create prompt for gender detection
+    const prompt = `Analyze this selfie image and determine the gender of the person. 
+    
+    Instructions:
+    - Look at facial features, hair, and overall appearance
+    - Respond ONLY with a JSON object in this exact format: {"gender": "male" or "female", "confidence": number between 0-100, "reasoning": "brief explanation"}
+    - Be accurate and respectful
+    - If you cannot determine the gender clearly or if there's no person in the image, set confidence to 0
+    
+    Respond with ONLY the JSON object, no other text.`;
+
+    // Generate content with image
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType: mimeType,
+          data: imageBase64,
+        },
+      },
+    ]);
+
+    const response = await result.response;
+    const text = response.text();
+
+    console.log("[Gender Verification] AI Response:", text);
+
+    // Parse the JSON response
+    let aiResult;
+    try {
+      // Extract JSON from response (in case there's extra text)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        aiResult = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error(
+        "[Gender Verification] Failed to parse AI response:",
+        parseError
+      );
+      return res.status(500).json({
+        error: "Failed to analyze image",
+        details: "AI response was not in expected format",
+      });
+    }
+
+    // Validate the response
+    const gender = aiResult.gender?.toLowerCase();
+    const confidence = parseFloat(aiResult.confidence) || 0;
+
+    console.log(
+      `[Gender Verification] Detected: ${gender}, Confidence: ${confidence}%`
+    );
+
+    // Determine if verification passed
+    const isVerified = gender === "female" && confidence >= 60;
+
+    // Prepare response
+    const verificationResponse = {
+      isVerified,
+      gender,
+      confidence,
+      reasoning: aiResult.reasoning,
+      message: isVerified
+        ? "Verification successful! You can proceed to signup."
+        : gender === "male"
+        ? "Sorry, this platform is currently only available for women."
+        : "We couldn't verify your identity clearly. Please try again with better lighting and ensure your face is clearly visible.",
+    };
+
+    res.json(verificationResponse);
+  } catch (error) {
+    console.error("[Gender Verification] Error:", error);
+    res.status(500).json({
+      error: "Verification failed",
+      details: error.message,
+    });
   }
 });
 

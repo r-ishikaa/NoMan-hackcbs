@@ -7,6 +7,7 @@ import { MacbookScrollDemo } from './components/ui/macbook-scroll-demo.jsx'
 import Testimonials from './components/Testimonials.jsx'
 import Login from './components/pages/Login.jsx'
 import Signup from './components/pages/Signup.jsx'
+import GenderVerification from './components/pages/GenderVerification.jsx'
 import Profile from './components/pages/Profile.jsx'
 import ProfileEdit from './components/pages/ProfileEdit.jsx'
 import PostCreate from './components/pages/PostCreate.jsx'
@@ -66,6 +67,7 @@ function App() {
           {/* Home: Landing page with Header */}
           <Route index element={<div></div>} />
           <Route path="login" element={<Login />} />
+          <Route path="verify-gender" element={<GenderVerification />} />
           <Route path="signup" element={<Signup />} />
           <Route path="auth/auth0/callback" element={<Auth0Callback />} />
           <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

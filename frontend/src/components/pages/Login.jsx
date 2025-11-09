@@ -195,7 +195,7 @@ const Login = () => {
         
         <div className="flex align-center justify-center" style={{marginTop: '24px', textAlign: 'center'}}>
           <p style={{color: '#cfcfcf', fontSize: '14px'}}>
-            <a href="/signup" style={{color: '#999999'}}>
+            <a href="/verify-gender" style={{color: '#999999'}}>
             Don't have an account? 
             {' '}Sign up
             </a>

@@ -110,7 +110,9 @@ export default function PublicProfile() {
 
         const postsRes = await fetch(API_CONFIG.getApiUrl(`/posts?accountId=${encodeURIComponent(profileAccountId)}`))
         const fetchedPosts = postsRes.ok ? await postsRes.json() : []
-        const normalizedPosts = (Array.isArray(fetchedPosts) ? fetchedPosts : []).map((p) => {
+        // Filter out anonymous posts from public profile
+        const nonAnonymousPosts = (Array.isArray(fetchedPosts) ? fetchedPosts : []).filter(p => !p.isAnonymous)
+        const normalizedPosts = nonAnonymousPosts.map((p) => {
           // Use post.author if available, otherwise fall back to profile data
           const author = p.author || {
             name: profile?.displayName || "Anonymous",

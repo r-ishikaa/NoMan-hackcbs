@@ -1,17 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import API_CONFIG from '../../config/api'
 
 const Signup = () => {
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('user')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Check if user has completed gender verification
+  useEffect(() => {
+    const genderVerified = location.state?.genderVerified
+    if (!genderVerified) {
+      // Redirect to gender verification if not verified
+      navigate('/verify-gender')
+    }
+  }, [location, navigate])
 
   // Redirect to profile if already authenticated
   useEffect(() => {

@@ -250,7 +250,7 @@ const Discover = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-16 pb-8 px-4 flex justify-center">
       {/* Centered Container */}
-      <div className="max-w-3xl w-full">
+      <div className="max-w-4xl w-full">
         {/* Header */}
         <div className="mb-6 bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
@@ -345,7 +345,7 @@ const Discover = () => {
 
         {/* Posts Feed */}
         {!loading && allPosts.length > 0 && (
-          <div className="space-y-4 flex flex-col items-center">
+          <div className="space-y-6 flex flex-col items-center">
             {allPosts.map((post) => {
               // For anonymous posts, don't fetch or show any profile info
               const isAnonymous = post.isAnonymous === true || post.accountId === null;
@@ -366,7 +366,7 @@ const Discover = () => {
               };
               
               return (
-                <div key={post.id || post._id} className="w-full max-w-2xl">
+                <div key={post.id || post._id} className="w-full">
                 <PostCard
                     post={formattedPost}
                     authorName={isAnonymous ? 'Anonymous' : (profile.displayName || profile.accountId)}
