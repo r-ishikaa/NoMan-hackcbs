@@ -136,6 +136,7 @@ const Profile = () => {
     const run = async () => {
       if (ran) return; ran = true
       try {
+        // Step 1: Get current user (required first)
         const meRes = await fetch(API_CONFIG.getApiUrl('/users/me'), { headers: authHeaders() })
         if (!meRes.ok) throw new Error('auth')
         const me = await meRes.json()
@@ -143,32 +144,51 @@ const Profile = () => {
         if (!accountId) throw new Error('no-id')
         setMeId(accountId)
 
-        let prRes = await fetch(API_CONFIG.getApiUrl(`/profiles?accountId=${encodeURIComponent(accountId)}`))
-        let arr = prRes.ok ? await prRes.json() : []
-        if ((!arr || arr.length === 0) && me?.username) {
-          prRes = await fetch(API_CONFIG.getApiUrl(`/profiles?accountId=${encodeURIComponent(me.username)}`))
-          arr = prRes.ok ? await prRes.json() : []
-        }
-        setProfile(arr?.[0] || null)
+        // Step 2: Fetch all data in PARALLEL for faster loading 🚀
+        const [profileResult, statsResult, postsResult, reelsResult, scheduledResult] = await Promise.allSettled([
+          // Profile
+          fetch(API_CONFIG.getApiUrl(`/profiles?accountId=${encodeURIComponent(accountId)}`))
+            .then(r => r.ok ? r.json() : [])
+            .catch(() => []),
+          // Stats
+          fetch(API_CONFIG.getApiUrl(`/follow/stats?accountId=${encodeURIComponent(accountId)}`))
+            .then(r => r.ok ? r.json() : { followers: 0, following: 0 })
+            .catch(() => ({ followers: 0, following: 0 })),
+          // Posts
+          fetch(API_CONFIG.getApiUrl(`/posts?accountId=${encodeURIComponent(accountId)}`))
+            .then(r => r.ok ? r.json() : [])
+            .catch(() => []),
+          // Reels
+          fetch(API_CONFIG.getApiUrl('/reels'), { headers: authHeaders() })
+            .then(r => r.ok ? r.json() : { reels: [] })
+            .catch(() => ({ reels: [] })),
+          // Scheduled posts
+          fetch(API_CONFIG.getApiUrl(`/scheduled-posts?accountId=${encodeURIComponent(accountId)}`), { headers: authHeaders() })
+            .then(r => r.ok ? r.json() : [])
+            .catch(() => [])
+        ])
 
-        const statsRes = await fetch(API_CONFIG.getApiUrl(`/follow/stats?accountId=${encodeURIComponent(accountId)}`))
-        const stats = statsRes.ok ? await statsRes.json() : { followers: 0, following: 0 }
+        // Extract results
+        const arr = profileResult.status === 'fulfilled' ? profileResult.value : []
+        const profileData = arr?.[0] || null
+        setProfile(profileData)
+
+        const stats = statsResult.status === 'fulfilled' ? statsResult.value : { followers: 0, following: 0 }
         setCounts({ followers: Number(stats.followers || 0), following: Number(stats.following || 0) })
 
-        const prUserId = profile?._id || profile?.accountId || accountId
-        const profileAccountId = profile?.accountId || accountId
-        if (accountId && prUserId && String(profileAccountId) !== String(accountId)) {
-          const stRes = await fetch(API_CONFIG.getApiUrl(`/follow/status?followingId=${encodeURIComponent(profileAccountId)}`), { headers: authHeaders() })
-          if (stRes.ok) {
-            const j = await stRes.json()
-            setIsFollowing(!!j.following)
-          }
+        const profileAccountId = profileData?.accountId || accountId
+        
+        // Check follow status (only if viewing someone else's profile)
+        if (accountId && String(profileAccountId) !== String(accountId)) {
+          fetch(API_CONFIG.getApiUrl(`/follow/status?followingId=${encodeURIComponent(profileAccountId)}`), { headers: authHeaders() })
+            .then(r => r.ok ? r.json() : null)
+            .then(j => setIsFollowing(!!j?.following))
+            .catch(() => setIsFollowing(false))
         } else {
           setIsFollowing(false)
         }
 
-        const postsRes = await fetch(API_CONFIG.getApiUrl(`/posts?accountId=${encodeURIComponent(accountId)}`))
-        const fetched = postsRes.ok ? await postsRes.json() : []
+        const fetched = postsResult.status === 'fulfilled' ? postsResult.value : []
         const normalizedPosts = (Array.isArray(fetched) ? fetched : []).map((p) => {
           // Use post.author if available, otherwise fall back to profile data
           const author = p.author || {
@@ -238,14 +258,11 @@ const Profile = () => {
           }
         }
 
-        const reelsRes = await fetch(API_CONFIG.getApiUrl('/reels'), {
-          headers: authHeaders()
-        })
-        const reelsData = reelsRes.ok ? await reelsRes.json() : { reels: [] }
+        // Process reels data (already fetched in parallel)
+        const reelsData = reelsResult.status === 'fulfilled' ? reelsResult.value : { reels: [] }
         const allReels = Array.isArray(reelsData.reels) ? reelsData.reels : []
 
         // Filter reels to only those authored by the profile's account
-        const targetAccountId = profileAccountId
         const authoredReels = allReels.filter((r) => {
           const authorId =
             (r.author && (r.author._id || r.author.id)) ||
@@ -255,7 +272,7 @@ const Profile = () => {
             r.accountId ||
             r.userId ||
             r.ownerId
-          return targetAccountId && authorId && String(authorId) === String(targetAccountId)
+          return accountId && authorId && String(authorId) === String(accountId)
         })
 
         const normalizedReels = authoredReels.map((r) => ({
@@ -276,17 +293,15 @@ const Profile = () => {
         }))
         setReels(normalizedReels)
         setCounts(prev => ({ ...prev, reels: normalizedReels.length }))
-        // Fetch scheduled posts
-        const scheduledRes = await fetch(API_CONFIG.getApiUrl(`/scheduled-posts?accountId=${encodeURIComponent(accountId)}`), {
-          headers: authHeaders()
-        })
-        const scheduledData = scheduledRes.ok ? await scheduledRes.json() : []
+        
+        // Process scheduled posts (already fetched in parallel)
+        const scheduledData = scheduledResult.status === 'fulfilled' ? scheduledResult.value : []
         const normalizedScheduled = (Array.isArray(scheduledData) ? scheduledData : []).map((p) => {
           // Use author info from backend response, which should have username
           const author = p.author || {
-            name: profile?.displayName || "Anonymous",
-            username: profile?.username || profile?.accountId || accountId || "anonymous",
-            avatarUrl: profile?.avatarUrl || null,
+            name: profileData?.displayName || "Anonymous",
+            username: profileData?.username || profileData?.accountId || accountId || "anonymous",
+            avatarUrl: profileData?.avatarUrl || null,
           };
           return {
             id: p.id || p._id,
