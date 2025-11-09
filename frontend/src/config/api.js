@@ -9,7 +9,7 @@ const API_CONFIG = {
   FASTAPI_URL: "http://localhost:8000",
   NODEJS_URL: "http://localhost:5003",
   // Hardcoded deployed backend URL
-  DEPLOYED_URL: "https://backend-1-kohl.vercel.app",
+  DEPLOYED_URL: "https://no-man-hackcbs.vercel.app",
 
   // Get custom VR backend URL from localStorage (for network connections)
   getCustomVRBackendUrl: () => {
