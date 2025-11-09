@@ -10,8 +10,8 @@
     "reels": "Reels",
     "studio": "Studio",
     "feed": "Feed",
-    "vr": "VR Classroom",
-    "classroom": "Classroom",
+    "vr": "VR Room",
+    "classroom": "Room",
     "about": "About",
     "challenges": "Challenges",
     "loading": "Loading...",
@@ -94,7 +94,7 @@
     "signUpWithGoogle": "Sign up with Google"
   },
   "vr": {
-    "title": "VR Classroom",
+    "title": "VR Room",
     "joinRoom": "Join Room",
     "enterUsername": "Enter your username",
     "connecting": "Connecting...",

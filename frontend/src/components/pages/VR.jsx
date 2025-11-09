@@ -239,8 +239,8 @@ const PersonAvatar = ({ position, name, color = "#ffb74d", isSpeaking = false })
   );
 };
 
-// Main Classroom Scene
-const ClassroomScene = ({ speakingUsers = [], whiteboardImage, onWhiteboardClick }) => {
+// Main Room Scene
+const RoomScene = ({ speakingUsers = [], whiteboardImage, onWhiteboardClick }) => {
   // People sitting around the table
   const tablePositions = [
     { pos: [-6, 0.75, -2], name: "Alice", color: "#ef5350" },
@@ -325,7 +325,7 @@ const ClassroomScene = ({ speakingUsers = [], whiteboardImage, onWhiteboardClick
 };
 
 // Main App Component
-export default function VRClassroom() {
+export default function VRRoom() {
   const [loading, setLoading] = useState(false);
   const [socket, setSocket] = useState(null);
   const [username, setUsername] = useState('');
@@ -784,7 +784,7 @@ export default function VRClassroom() {
               fontWeight: '700',
               color: '#1976d2',
             }}>
-              🎮 Join VR Classroom
+              🎮 Join VR Room
             </h2>
             <input
               type="text"
@@ -895,7 +895,7 @@ export default function VRClassroom() {
         >
           <PerspectiveCamera makeDefault position={[0, 8, 18]} fov={60} />
           <Suspense fallback={null}>
-            <ClassroomScene 
+            <RoomScene 
               speakingUsers={speakingUsers} 
               whiteboardImage={whiteboardImage}
               onWhiteboardClick={handleWhiteboardClick}
@@ -1154,7 +1154,7 @@ export default function VRClassroom() {
             fontWeight: '700',
             color: '#000000'
           }}>
-            VR Classroom
+            VR Room
           </h2>
           <div style={{ fontSize: '14px', lineHeight: '1.8', color: '#666666' }}>
             <p style={{ margin: '8px 0' }}>

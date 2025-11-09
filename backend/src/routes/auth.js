@@ -480,4 +480,67 @@ router.post("/logout", async (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
+// Auth0 token exchange endpoint
+router.post("/auth0/exchange", async (req, res) => {
+  try {
+    const { auth0Token, email, name, picture, sub } = req.body;
+
+    if (!auth0Token || !email || !sub) {
+      return res.status(400).json({ error: "Missing required Auth0 data" });
+    }
+
+    // Find or create user based on Auth0 sub (unique identifier)
+    let user = await User.findOne({ auth0Sub: sub });
+
+    if (!user) {
+      // Check if user exists with this email (from other auth methods)
+      user = await User.findOne({ email });
+
+      if (user) {
+        // Link Auth0 account to existing user
+        user.auth0Sub = sub;
+        if (picture && !user.profilePicture) {
+          user.profilePicture = picture;
+        }
+        await user.save();
+      } else {
+        // Create new user from Auth0 data
+        const username =
+          email.split("@")[0] + "_" + Math.random().toString(36).substring(7);
+
+        user = new User({
+          username,
+          email,
+          auth0Sub: sub,
+          profilePicture: picture || "",
+          fullName: name || username,
+          role: "user", // Default role, can be changed later
+          isActive: true,
+        });
+
+        await user.save();
+      }
+    }
+
+    // Generate JWT token for your backend
+    const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.json({
+      access_token: token,
+      refresh_token: refreshToken,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profilePicture: user.profilePicture,
+      },
+    });
+  } catch (error) {
+    console.error("Auth0 exchange error:", error);
+    res.status(500).json({ error: "Failed to exchange Auth0 token" });
+  }
+});
+
 export default router;

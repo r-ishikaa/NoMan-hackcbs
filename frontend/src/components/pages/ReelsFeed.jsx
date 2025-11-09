@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Heart, MessageCircle, Share2, Bookmark } from 'lucide-react'
 import API_CONFIG from '../../config/api.js'
 // Using vertical snap feed; Apple-style card is rendered inline per item
 
@@ -204,10 +205,14 @@ export default function ReelsFeed() {
   const [playing, setPlaying] = useState(true)
   const sceneTimerRef = useRef(null)
   const itemRefs = useRef([])
+  const videoRefs = useRef([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [touchStart, setTouchStart] = useState(null)
-  const [touchEnd, setTouchEnd] = useState(null)
+  const [likedReels, setLikedReels] = useState({})
+  const [showComments, setShowComments] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [comments, setComments] = useState([])
+  const [loadingComments, setLoadingComments] = useState(false)
 
   // Fetch reels
   const fetchReels = useCallback(async (pageNum = 1) => {
@@ -266,6 +271,30 @@ export default function ReelsFeed() {
     return () => observer.disconnect()
   }, [reels])
 
+  // Control video playback based on active index
+  useEffect(() => {
+    if (!reels || reels.length === 0) return
+    
+    // Play active video, pause all others
+    videoRefs.current.forEach((video, idx) => {
+      if (!video) return
+      
+      if (idx === activeIndex && playing) {
+        // Play active video with audio
+        video.muted = false
+        video.play().catch(err => {
+          // If autoplay with audio fails, try muted first
+          console.log('Autoplay with audio blocked, trying muted:', err)
+          video.muted = true
+          video.play().catch(e => console.log('Video play failed:', e))
+        })
+      } else {
+        // Pause non-active videos
+        video.pause()
+      }
+    })
+  }, [activeIndex, reels, playing])
+
   // Auto-advance scenes for the active reel (image-based reels)
   useEffect(() => {
     if (!reels || reels.length === 0) return
@@ -311,10 +340,104 @@ export default function ReelsFeed() {
     return () => io.disconnect()
   }, [reels, hasMore, page, fetchReels])
 
-  const togglePlay = () => setPlaying((p) => !p)
+
+  const handleLike = async (reelId) => {
+    try {
+      const res = await fetch(API_CONFIG.getApiUrl(`/reels/${reelId}/like`), {
+        method: 'POST',
+        headers: authHeaders()
+      })
+      const data = await res.json()
+      
+      if (data.success) {
+        setLikedReels(prev => ({ ...prev, [reelId]: data.liked }))
+        // Update like count in reels array
+        setReels(prev => prev.map(reel => 
+          reel._id === reelId ? { ...reel, likeCount: data.likeCount } : reel
+        ))
+      }
+    } catch (error) {
+      console.error('Failed to like reel:', error)
+    }
+  }
+
+  const handleShare = async (reel) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: reel.title,
+          text: reel.script || reel.title,
+          url: window.location.origin + `/reels/${reel._id}`
+        })
+      } catch (err) {
+        console.log('Share cancelled or failed:', err)
+      }
+    } else {
+      // Fallback: copy to clipboard
+      const url = window.location.origin + `/reels/${reel._id}`
+      navigator.clipboard.writeText(url).then(() => {
+        alert('Link copied to clipboard!')
+      })
+    }
+  }
+
+  const handleOpenComments = async (reelId) => {
+    setShowComments(true)
+    setLoadingComments(true)
+    try {
+      const res = await fetch(API_CONFIG.getApiUrl(`/comments?targetType=reel&targetId=${reelId}`), {
+        headers: authHeaders()
+      })
+      const data = await res.json()
+      setComments(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Failed to fetch comments:', error)
+      setComments([])
+    } finally {
+      setLoadingComments(false)
+    }
+  }
+
+  const handlePostComment = async (reelId) => {
+    if (!commentText.trim()) return
+    
+    try {
+      const userStr = localStorage.getItem('hexagon_user') || localStorage.getItem('user')
+      const user = userStr ? JSON.parse(userStr) : null
+      
+      const res = await fetch(API_CONFIG.getApiUrl('/comments'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders()
+        },
+        body: JSON.stringify({
+          targetType: 'reel',
+          targetId: reelId,
+          accountId: user?._id || user?.id,
+          content: commentText
+        })
+      })
+      
+      const data = await res.json()
+      if (data._id) {
+        setComments(prev => [data, ...prev])
+        setCommentText('')
+      }
+    } catch (error) {
+      console.error('Failed to post comment:', error)
+    }
+  }
   
   useEffect(() => () => { 
     clearInterval(sceneTimerRef.current)
+    // Pause and cleanup all videos
+    videoRefs.current.forEach(video => {
+      if (video) {
+        video.pause()
+        video.src = ''
+      }
+    })
     try { 
       if ('speechSynthesis' in window) window.speechSynthesis.cancel() 
     } catch (err) {
@@ -335,7 +458,6 @@ export default function ReelsFeed() {
       {/* Vertical snap-scrolling feed */}
       <div className="h-screen w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
         {reels.map((reel, idx) => {
-          const isActive = idx === activeIndex
           const currentScene = reel.videoUrl
             ? null
             : (reel.scenes?.[sceneIdx] || reel.scenes?.[0])
@@ -351,12 +473,12 @@ export default function ReelsFeed() {
                 {reel.videoUrl ? (
                   // Video reel
                   <video
+                    ref={(el) => (videoRefs.current[idx] = el)}
                     src={API_CONFIG.getApiUrl(reel.videoUrl)}
                     className="w-full h-full object-cover"
-                    muted
                     playsInline
-                    autoPlay={isActive}
                     loop
+                    preload="metadata"
                   />
                 ) : currentScene?.imageUrl ? (
                   // Image-based scene
@@ -377,31 +499,142 @@ export default function ReelsFeed() {
                   </div>
                 )}
 
+                {/* Action buttons (right side) */}
+                <div className="absolute right-4 bottom-24 flex flex-col gap-6">
+                  {/* Like button */}
+                  <button
+                    onClick={() => handleLike(reel._id || reel.id)}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                      likedReels[reel._id || reel.id] 
+                        ? 'bg-red-500 scale-110' 
+                        : 'bg-white/20 backdrop-blur-sm group-hover:bg-white/30'
+                    }`}>
+                      <Heart 
+                        className={`w-6 h-6 transition-all ${
+                          likedReels[reel._id || reel.id] 
+                            ? 'fill-white text-white' 
+                            : 'text-white'
+                        }`} 
+                      />
+                    </div>
+                    <span className="text-white text-xs font-semibold">
+                      {reel.likeCount || 0}
+                    </span>
+                  </button>
+
+                  {/* Comment button */}
+                  <button
+                    onClick={() => handleOpenComments(reel._id || reel.id)}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm group-hover:bg-white/30 flex items-center justify-center transition-all">
+                      <MessageCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-white text-xs font-semibold">
+                      {reel.commentCount || 0}
+                    </span>
+                  </button>
+
+                  {/* Share button */}
+                  <button
+                    onClick={() => handleShare(reel)}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm group-hover:bg-white/30 flex items-center justify-center transition-all">
+                      <Share2 className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-white text-xs font-semibold">
+                      Share
+                    </span>
+                  </button>
+                </div>
+
                 {/* Overlay info */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-transparent to-transparent">
-                  <div className="text-white text-sm opacity-80 mb-1">
-                    {idx + 1} / {reels.length}
-                  </div>
-                  <h3 className="text-white text-base font-semibold line-clamp-2">
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <h3 className="text-white text-base font-semibold line-clamp-2 mb-1">
                     {reel.title || 'Untitled Reel'}
                   </h3>
                   {currentScene?.text && (
-                    <div className="text-white/90 text-sm line-clamp-2 mt-1">{currentScene.text}</div>
+                    <div className="text-white/90 text-sm line-clamp-2">{currentScene.text}</div>
                   )}
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      onClick={togglePlay}
-                      className="px-4 py-1.5 rounded-full bg-white/95 text-black text-xs font-medium"
-                    >
-                      {playing ? t('common.pause') : t('common.play')}
-                    </button>
-                  </div>
                 </div>
               </div>
             </section>
           )
         })}
       </div>
+
+      {/* Comments Modal */}
+      {showComments && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center">
+          <div className="bg-white rounded-t-3xl w-full max-w-2xl h-[70vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Comments</h3>
+              <button
+                onClick={() => setShowComments(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
+                <span className="text-gray-600 text-xl">×</span>
+              </button>
+            </div>
+
+            {/* Comments list */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingComments ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-8 h-8 border-3 border-gray-300 border-t-purple-600 rounded-full animate-spin"></div>
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                  <MessageCircle className="w-12 h-12 mb-2 opacity-50" />
+                  <p>No comments yet. Be the first!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {comments.map((comment) => (
+                    <div key={comment._id} className="flex gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0"></div>
+                      <div className="flex-1">
+                        <div className="bg-gray-100 rounded-2xl px-4 py-2">
+                          <p className="font-semibold text-sm text-gray-900">{comment.accountId}</p>
+                          <p className="text-gray-700 text-sm">{comment.content}</p>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 ml-4">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Comment input */}
+            <div className="p-4 border-t border-gray-200">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handlePostComment(reels[activeIndex]?._id || reels[activeIndex]?.id)}
+                  placeholder="Add a comment..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <button
+                  onClick={() => handlePostComment(reels[activeIndex]?._id || reels[activeIndex]?.id)}
+                  disabled={!commentText.trim()}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-semibold hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Post
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,3 @@
-
-
 <div align="center">
 
 **A comprehensive learning platform with immersive VR classrooms, interactive challenges, and social features**
@@ -38,6 +36,7 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 ## ✨ Features
 
 ### 🔐 Authentication & User Management
+
 - **Local Authentication**: Secure email/password registration and login
 - **Google OAuth 2.0**: One-click sign-in with Google accounts
 - **JWT-based Sessions**: Secure token-based authentication
@@ -45,6 +44,7 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Public Profiles**: Shareable profile pages for networking
 
 ### 📚 Learning Management
+
 - **Course System**: Create, browse, and enroll in courses
 - **Course Details**: Rich course pages with descriptions, reviews, and progress tracking
 - **Enrollments**: Track course enrollment status and progress
@@ -53,12 +53,14 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Learning Dashboard**: Personalized dashboard with progress tracking
 
 ### 🎮 Challenges & Competitions
+
 - **Challenge Types**: Hackathons, Quizzes, Events, and Bounties
 - **Interactive Quizzes**: Real-time MCQ quizzes with instant feedback
 - **Challenge Details**: Detailed pages for each challenge type
 - **Search & Filter**: Find challenges by type, title, or organizer
 
 ### 🎥 Content Creation & Social
+
 - **Posts**: Create and share educational posts
 - **Comments & Likes**: Engage with community content
 - **Follow System**: Follow other users and build your network
@@ -66,7 +68,8 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Reels Feed**: Browse and interact with short-form educational content
 - **Reel Interactions**: Like and comment on reels
 
-### 🌐 Virtual Reality Classroom
+### 🌐 Virtual Reality Room
+
 - **3D School Environment**: Navigate through a virtual school with multiple classrooms
 - **Real-time Voice Chat**: Communicate with peers using Web Audio API
 - **Interactive Whiteboard**: Upload and share images on synchronized whiteboards
@@ -76,6 +79,7 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Multi-classroom Support**: Independent meetings for each classroom
 
 ### 📊 Analytics & Portfolio
+
 - **Activity Heat Map**: Visualize learning activity over time (GitHub-style)
 - **Skill Progress Tracking**: Monitor progress across different skills
 - **Monthly Performance Charts**: Track performance trends over time
@@ -84,17 +88,20 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Learning Timeline**: Visual journey of your learning milestones
 
 ### Performance improvements
+
 - **Course listings**: served from Redis (faster than MongoDB)
 - **User searches**: cached results reduce database queries
 - **Cache invalidation**: automatic on data changes
 - **Fallback**: if Redis is unavailable, queries go directly to MongoDB
 
 ### 🔔 Notifications & Communication
+
 - **Real-time Notifications**: Socket.IO-based instant notifications
 - **Push Notifications**: Web Push API for browser notifications
 - **Notification Center**: Centralized notification management
 
 ### 🌍 Internationalization
+
 - **Multi-language Support**: 13+ languages including:
   - English, Hindi, Bengali, Gujarati
   - Spanish, French, German, Chinese, Japanese
@@ -107,6 +114,7 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 ## 🛠 Tech Stack
 
 ### Frontend
+
 - **React 19.1.1**: UI framework
 - **Vite**: Build tool and dev server
 - **React Router 7**: Client-side routing
@@ -119,6 +127,7 @@ HackOMania is a modern, full-stack educational platform that combines traditiona
 - **Motion**: Animation library
 
 ### Backend
+
 - **Node.js 18+**: Runtime environment
 - **Express.js**: Web framework
 - **MongoDB**: Database with Mongoose ODM
@@ -143,7 +152,7 @@ HackOMania/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── pages/          # Page components
-│   │   │   │   ├── VR.jsx      # VR Classroom
+│   │   │   │   ├── VR.jsx      # VR Room
 │   │   │   │   ├── dashboard.jsx
 │   │   │   │   ├── courses.jsx
 │   │   │   │   ├── challenges.jsx
@@ -203,26 +212,30 @@ HackOMania/
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd HackOMania
    ```
 
 2. **Install backend dependencies**
+
    ```bash
    cd backend
    npm install
    ```
 
 3. **Install frontend dependencies**
+
    ```bash
    cd ../frontend
    npm install
    ```
 
 4. **Configure environment variables**
-   
+
    Backend: Copy `backend/env.example` to `backend/.env` and fill in your values:
+
    ```bash
    cd ../backend
    cp env.example .env
@@ -231,12 +244,14 @@ HackOMania/
    Frontend: Update `frontend/src/config/api.js` with your backend URL.
 
 5. **Start MongoDB**
+
    ```bash
    # If using local MongoDB
    mongod
    ```
 
 6. **Start the backend server**
+
    ```bash
    cd backend
    npm run dev  # Development mode with nodemon
@@ -245,6 +260,7 @@ HackOMania/
    ```
 
 7. **Start the frontend development server**
+
    ```bash
    cd frontend
    npm run dev
@@ -293,12 +309,13 @@ FRONTEND_URL=http://localhost:5173
 ### Frontend Configuration
 
 Update `frontend/src/config/api.js`:
+
 ```javascript
 const API_CONFIG = {
   getApiUrl: (path) => {
-    const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5003';
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5003";
     return `${baseUrl}${path}`;
-  }
+  },
 };
 ```
 
@@ -307,6 +324,7 @@ const API_CONFIG = {
 ## 📡 API Documentation
 
 ### Authentication Endpoints
+
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
 - `POST /api/auth/google` - Google OAuth login
@@ -314,11 +332,13 @@ const API_CONFIG = {
 - `GET /api/auth/me` - Get current user
 
 ### User Endpoints
+
 - `GET /api/users` - List users
 - `GET /api/users/:id` - Get user details
 - `PUT /api/users/:id` - Update user
 
 ### Course Endpoints
+
 - `GET /api/courses` - List all courses
 - `GET /api/courses/:id` - Get course details
 - `POST /api/courses` - Create course (authenticated)
@@ -326,17 +346,20 @@ const API_CONFIG = {
 - `GET /api/enrollments/me` - Get user enrollments
 
 ### Post Endpoints
+
 - `GET /api/posts` - List posts
 - `POST /api/posts` - Create post
 - `POST /api/posts/:id/like` - Like/unlike post
 - `POST /api/posts/:id/comments` - Add comment
 
-### VR Classroom Endpoints
+### VR Room Endpoints
+
 - `GET /api/vr` - Get VR room info
 - `GET /api/vr/users` - Get users in VR room
 - `GET /api/vr/classrooms` - List available classrooms
 
 ### Socket.IO Namespaces
+
 - `/vr` - VR classroom real-time events
 - `/notifications` - Real-time notifications
 
@@ -344,7 +367,7 @@ const API_CONFIG = {
 
 ## 🔍 Key Features Deep Dive
 
-### VR Classroom Architecture
+### VR Room Architecture
 
 The VR classroom uses React Three Fiber for 3D rendering and Socket.IO for real-time communication:
 
@@ -358,6 +381,7 @@ The VR classroom uses React Three Fiber for 3D rendering and Socket.IO for real-
 ### Challenge System
 
 The platform supports four types of challenges:
+
 - **Hackathons**: Timed coding competitions
 - **Quizzes**: Interactive MCQ assessments with instant feedback
 - **Events**: Learning events and workshops
@@ -366,6 +390,7 @@ The platform supports four types of challenges:
 ### Reels Studio
 
 AI-powered content creation:
+
 - Uses Google Gemini API to generate educational reel scripts
 - Creates 4 variations of 30-second educational content
 - Supports image generation (optional)
@@ -373,6 +398,7 @@ AI-powered content creation:
 ### Dashboard Analytics
 
 Comprehensive learning analytics including:
+
 - Activity heat map (GitHub-style contribution graph)
 - Skill progress bars
 - Monthly performance charts
@@ -396,6 +422,7 @@ Comprehensive learning analytics including:
 ### Frontend Deployment
 
 1. Build for production:
+
    ```bash
    cd frontend
    npm run build
@@ -450,4 +477,3 @@ For questions, issues, or contributions, please open an issue on the repository.
 [Report Bug](https://github.com/your-repo/issues) · [Request Feature](https://github.com/your-repo/issues) · [Documentation](#)
 
 </div>
-

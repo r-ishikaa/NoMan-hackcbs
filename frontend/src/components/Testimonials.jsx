@@ -2,68 +2,69 @@ import React from 'react';
 
 const testimonials = [
   {
-    name: "Rayhan Hossain Rahat",
-    username: "@th_rahat_dev",
-    avatar: "/avatars/rayhan.jpg",
-    content: "Absolutely Awesome, Would really love to use some of these in my projects",
+    name: "Sarah Johnson",
+    username: "@sarahj_wellness",
+    avatar: "/avatars/sarah.jpg",
+    content: "NoMan changed my life! I found my tribe and finally feel supported. This community is everything! 💪",
     verified: true
   },
   {
-    name: "Paarth Agarwal",
-    username: "@PaarthAgarwal7",
-    avatar: "/avatars/paarth.jpg",
-    content: "I just tried it out this is crazy awesome"
+    name: "Maria Garcia",
+    username: "@maria_creates",
+    avatar: "/avatars/maria.jpg",
+    content: "The collaboration features are incredible! I've partnered with amazing women and grown my business. 🚀"
   },
   {
-    name: "Micky",
-    username: "@rasmickyy",
-    avatar: "/avatars/micky.jpg",
-    content: "Yoo.... This has to be the most beautiful component library I've ever seen!! ui.aceternity.com Shoutout to @mannupaaji for releasing this for free!",
+    name: "Emma Wilson",
+    username: "@emmafitness",
+    avatar: "/avatars/emma.jpg",
+    content: "I love how supportive everyone is here! The communities are so uplifting. Best decision ever! ❤️",
     verified: true
   },
   {
-    name: "iOS/MacOS Developer | Swift...",
-    username: "@inLessmore",
-    avatar: "/avatars/ios-dev.jpg",
-    content: "I really like it.I will try to use it my next app"
+    name: "Priya Patel",
+    username: "@priya_artist",
+    avatar: "/avatars/priya.jpg",
+    content: "Finally, a space where I can be myself! The creative community here is amazing. NoMan is pure magic! ✨"
   },
   {
-    name: "Rajdeep Seth",
-    username: "@rajdeepseth1",
-    avatar: "/avatars/rajdeep.jpg",
-    content: "Stumbled upon ui.aceternity.com today and my mind is blown 🤯\nThe seamless integration of framer-motion, tailwind CSS, and shadcn showcases a masterclass in UI design. 🚀 Kudos to @mannupaaji for creating such an innovative and inspirational resource for devs! #UI #nextjs"
-  },
-  {
-    name: "Rumit Dhamecha • રુમિત ધામે...",
-    username: "@potatopato",
-    avatar: "/avatars/rumit.jpg",
-    content: "I like the interaction and animation. Beautiful!"
-  },
-  {
-    name: "Aamar",
-    username: "@aamarkanji",
-    avatar: "/avatars/aamar.jpg",
-    content: "Man this is awesome",
+    name: "Jessica Lee",
+    username: "@jesstech",
+    avatar: "/avatars/jessica.jpg",
+    content: "The mentorship program is outstanding! I've learned so much and connected with inspiring women in tech. 🎯",
     verified: true
   },
   {
-    name: "Vinay",
-    username: "@vinayisactive",
-    avatar: "/avatars/vinay.jpg",
-    content: "Upon my return from a short break every time, I consistently find innovative additions by you 🔥"
+    name: "Sophia Chen",
+    username: "@sophiawellness",
+    avatar: "/avatars/sophia.jpg",
+    content: "NoMan helped me build my brand and reach thousands of women! The engagement is real. Forever grateful! 🌟"
   },
   {
-    name: "Rajesh David",
-    username: "@rajeshdavidbabu",
-    avatar: "/avatars/rajesh.jpg",
-    content: "ui.aceternity.com\n\nSo well done. And its bloody free 🤪🤪\n\nPhenomenal work by @mannupaaji",
+    name: "Aisha Rahman",
+    username: "@aisha_inspires",
+    avatar: "/avatars/aisha.jpg",
+    content: "This platform empowers me every single day. The support system here is unmatched! 💖",
     verified: true
   },
   {
-    name: "Cody De Arkland",
-    username: "@CodydeArkland",
-    avatar: "/avatars/cody.jpg",
-    content: "This library is so dope. Stoked to see more components drop.",
+    name: "Olivia Brown",
+    username: "@olivia_entrepreneur",
+    avatar: "/avatars/olivia.jpg",
+    content: "From courses to communities, everything I need to grow is here. NoMan is a game-changer! 🔥"
+  },
+  {
+    name: "Zara Khan",
+    username: "@zara_creative",
+    avatar: "/avatars/zara.jpg",
+    content: "The most authentic and empowering community I've ever been part of. Thank you NoMan! 🙏",
+    verified: true
+  },
+  {
+    name: "Isabella Martinez",
+    username: "@bella_coach",
+    avatar: "/avatars/isabella.jpg",
+    content: "My confidence has skyrocketed since joining! The women here lift each other up daily. 💫",
     verified: true
   }
 ];

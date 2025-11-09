@@ -433,22 +433,18 @@ export default function RandomVideoCall() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl">
-        <div className="text-center mb-6">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 drop-shadow-lg">Random Video Chat</h1>
-          <p className="text-gray-200 text-lg">Connect with random people around the world</p>
-        </div>
-
-        {!permissionsGranted && status === 'idle' && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-6 border border-white/20 shadow-2xl">
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      {/* Permission Screen */}
+      {!permissionsGranted && status === 'idle' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 z-50">
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl max-w-md">
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Video className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Camera & Microphone Access</h2>
               <p className="text-gray-300 mb-6">
-                We need access to your camera and microphone to start video calls
+                Grant access to start video calls
               </p>
               <button
                 onClick={requestPermissions}
@@ -459,107 +455,102 @@ export default function RandomVideoCall() {
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/50 rounded-2xl text-white text-center shadow-lg">
-            <p className="font-medium">{error}</p>
-          </div>
-        )}
+      {/* Error Message */}
+      {error && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-red-500/90 backdrop-blur-sm border border-red-600 rounded-full text-white text-center shadow-lg">
+          <p className="font-medium text-sm">{error}</p>
+        </div>
+      )}
 
-        {permissionsGranted && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <div className="relative aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              {status === 'connected' && partnerUsername && (
-                <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600/90 to-pink-600/90 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg">
-                  🎭 {partnerUsername}
-                </div>
-              )}
-              {status !== 'connected' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/50 to-blue-900/50 backdrop-blur-sm">
-                  <div className="text-center">
-                    {status === 'idle' && (
-                      <>
-                        <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                          <Video className="w-12 h-12 text-white" />
-                        </div>
-                        <p className="text-white text-lg font-medium">Ready to connect</p>
-                        <p className="text-gray-300 text-sm mt-1">Click "Start" to find someone</p>
-                      </>
-                    )}
-                    {status === 'searching' && (
-                      <>
-                        <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
-                          <Search className="w-12 h-12 text-white" />
-                        </div>
-                        <p className="text-white text-lg font-medium">Searching...</p>
-                        <p className="text-gray-300 text-sm mt-1">Looking for someone to connect with</p>
-                      </>
-                    )}
-                    {status === 'waiting' && (
-                      <>
-                        <div className="w-24 h-24 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                          <Search className="w-12 h-12 text-white animate-spin" />
-                        </div>
-                        <p className="text-white text-lg font-medium">Waiting...</p>
-                        <p className="text-gray-300 text-sm mt-1">You're next in line!</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover mirror"
-              />
-              <div className="absolute top-4 left-4 bg-gradient-to-r from-green-600/90 to-emerald-600/90 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg">
-                👤 You {!videoEnabled && '(Camera Off)'}
+      {/* Main Video Interface */}
+      {permissionsGranted && (
+        <div className="relative w-full h-screen">
+          {/* Remote Video (Full Screen) */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            {status === 'connected' && partnerUsername && (
+              <div className="absolute top-6 left-6 bg-gradient-to-r from-purple-600/90 to-pink-600/90 backdrop-blur-sm px-5 py-2 rounded-full text-white font-medium shadow-lg">
+                {partnerUsername}
               </div>
-              {!videoEnabled && (
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <VideoOff className="w-10 h-10 text-gray-400" />
-                    </div>
-                    <p className="text-gray-400 text-sm">Camera Off</p>
-                  </div>
+            )}
+            {status !== 'connected' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/80 to-blue-900/80 backdrop-blur-sm">
+                <div className="text-center">
+                  {status === 'idle' && (
+                    <>
+                      <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                        <Video className="w-16 h-16 text-white" />
+                      </div>
+                      <p className="text-white text-2xl font-bold">Ready to Connect</p>
+                    </>
+                  )}
+                  {status === 'searching' && (
+                    <>
+                      <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl animate-pulse">
+                        <Search className="w-16 h-16 text-white" />
+                      </div>
+                      <p className="text-white text-2xl font-bold">Searching...</p>
+                    </>
+                  )}
+                  {status === 'waiting' && (
+                    <>
+                      <div className="w-32 h-32 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                        <Search className="w-16 h-16 text-white animate-spin" />
+                      </div>
+                      <p className="text-white text-2xl font-bold">Connecting...</p>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        )}
 
-        {permissionsGranted && (
-          <div className="flex justify-center gap-3 flex-wrap">
+          {/* Local Video (Picture-in-Picture) */}
+          <div className="absolute bottom-24 right-6 w-64 h-48 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover mirror"
+            />
+            <div className="absolute top-3 left-3 bg-gradient-to-r from-green-600/90 to-emerald-600/90 backdrop-blur-sm px-3 py-1 rounded-full text-white text-xs font-medium shadow-lg">
+              You
+            </div>
+            {!videoEnabled && (
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+                <VideoOff className="w-12 h-12 text-gray-400" />
+              </div>
+            )}
+          </div>
+
+          {/* Control Buttons */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-3">
             {status === 'idle' && (
               <button
                 onClick={startSearch}
-                className="px-10 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-lg text-lg"
+                className="px-10 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-2xl text-lg"
               >
                 <Search className="w-6 h-6" />
-                Start Searching
+                Start
               </button>
             )}
 
             {(status === 'searching' || status === 'waiting') && (
               <button
                 onClick={stopSearch}
-                className="px-10 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-lg text-lg"
+                className="px-10 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-2xl text-lg"
               >
                 <PhoneOff className="w-6 h-6" />
-                Stop Searching
+                Stop
               </button>
             )}
 
@@ -567,7 +558,7 @@ export default function RandomVideoCall() {
               <>
                 <button
                   onClick={toggleVideo}
-                  className={`p-5 rounded-full font-medium transition-all transform hover:scale-110 shadow-lg ${
+                  className={`p-5 rounded-full font-medium transition-all transform hover:scale-110 shadow-2xl ${
                     videoEnabled
                       ? 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
                       : 'bg-gradient-to-br from-red-600 to-rose-600 text-white'
@@ -579,7 +570,7 @@ export default function RandomVideoCall() {
 
                 <button
                   onClick={toggleAudio}
-                  className={`p-5 rounded-full font-medium transition-all transform hover:scale-110 shadow-lg ${
+                  className={`p-5 rounded-full font-medium transition-all transform hover:scale-110 shadow-2xl ${
                     audioEnabled
                       ? 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
                       : 'bg-gradient-to-br from-red-600 to-rose-600 text-white'
@@ -591,55 +582,24 @@ export default function RandomVideoCall() {
 
                 <button
                   onClick={skipMatch}
-                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-lg text-lg"
+                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-2xl text-lg"
                 >
                   <SkipForward className="w-6 h-6" />
-                  Next Person
+                  Next
                 </button>
 
                 <button
                   onClick={stopSearch}
-                  className="px-8 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-lg text-lg"
+                  className="px-8 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-full font-semibold transition-all transform hover:scale-105 flex items-center gap-3 shadow-2xl text-lg"
                 >
                   <PhoneOff className="w-6 h-6" />
-                  End Call
+                  End
                 </button>
               </>
             )}
           </div>
-        )}
-
-        {permissionsGranted && (
-          <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-white border border-white/20 shadow-lg">
-            <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-              <span className="text-2xl">ℹ️</span>
-              How it works
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-200">
-              <li className="flex items-start gap-2">
-                <span className="text-green-400 font-bold">1.</span>
-                <span>Click <strong>"Start Searching"</strong> to find a random person to video chat with</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400 font-bold">2.</span>
-                <span>Once matched, you can talk via video and audio in real-time</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-purple-400 font-bold">3.</span>
-                <span>Click <strong>"Next Person"</strong> to skip and match with someone new</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-yellow-400 font-bold">4.</span>
-                <span>Use camera/mic buttons to toggle video and audio</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-red-400 font-bold">5.</span>
-                <span>Click <strong>"End Call"</strong> when you're done</span>
-              </li>
-            </ul>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <style>{`
         .mirror {

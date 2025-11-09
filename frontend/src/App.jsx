@@ -28,6 +28,7 @@ import CommunitiesPage from './components/pages/CommunitiesPage.jsx'
 import CommunityDetail from './components/pages/CommunityDetail.jsx'
 import PeriodTracker from './components/pages/PeriodTracker.jsx'
 import Notifications from './components/pages/Notifications.jsx'
+import Auth0Callback from './components/pages/Auth0Callback.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Loading from './components/Loading.jsx'
 import { Routes, Route, Outlet, useLocation } from 'react-router-dom'
@@ -49,31 +50,10 @@ function Layout() {
             <Header />
             {/* Navbar after Header on homepage */}
             <Navbar />
-            {/* Apple Cards Carousel Section - comes right after the hero */}
-            <section className="w-full bg-white">
-              <AppleCardsCarouselDemo />
-            </section>
-            
-            {/* Macbook Scroll Section - below Apple Cards */}
-            <section className="w-full bg-white">
-              <MacbookScrollDemo />
-            </section>
-            
             {/* Testimonials Section (forced white bg) */}
-            <div className="w-full bg-white">
-            <Testimonials />
-            </div>
-            <div className="w-full bg-white">
-            <TrustedBy />
-            </div>
-            {/* Glowing Effect Section */}
-            <section className="w-full bg-white py-16">
-              <GlowingEffectDemo />
-            </section>
           </>
         )}
       </main>
-      <Footer />
     </div>
   )
 }
@@ -87,6 +67,7 @@ function App() {
           <Route index element={<div></div>} />
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Signup />} />
+          <Route path="auth/auth0/callback" element={<Auth0Callback />} />
           <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
           <Route path="post/create" element={<ProtectedRoute><PostCreate /></ProtectedRoute>} />

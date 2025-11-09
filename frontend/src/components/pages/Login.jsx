@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import API_CONFIG from '../../config/api'
+import Auth0LoginButton from '../Auth0LoginButton'
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth()
@@ -170,6 +171,11 @@ const Login = () => {
             >
               Continue with Google
             </button>
+            
+            {/* Auth0 Login Button */}
+            <div style={{ marginTop: '12px' }}>
+              <Auth0LoginButton />
+            </div>
           </div>
         </form>
         

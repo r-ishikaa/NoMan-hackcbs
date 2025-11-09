@@ -35,11 +35,16 @@ const userSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ["local", "google"],
+      enum: ["local", "google", "auth0"],
       default: "local",
     },
     googleId: {
       type: String,
+    },
+    auth0Sub: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null values while maintaining uniqueness for non-null values
     },
     profile: {
       full_name: {

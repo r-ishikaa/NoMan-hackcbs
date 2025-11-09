@@ -33,9 +33,11 @@ import communityRoutes from "./routes/communities.js";
 import periodRoutes from "./routes/periods.js";
 import collaborationRoutes from "./routes/collaborations.js";
 import advertisementsRoutes from "./routes/advertisements.js";
+import tunnelRoutes from "./routes/tunnels.js";
 import { setupNotificationsSocket } from "./sockets/notifications.js";
 import { setNotificationsSocket } from "./utils/notificationBroadcaster.js";
 import { setupRandomVideoSocket } from "./sockets/randomVideo.js";
+import { setupTunnelSocket } from "./sockets/tunnels.js";
 import { initRedis, closeRedis } from "./config/redis.js";
 import { initKafkaProducer, closeKafka } from "./config/kafka.js";
 import { notificationConsumer } from "./services/notificationConsumer.js";
@@ -97,6 +99,11 @@ console.log("[Server] Notifications socket initialized");
 
 // Setup Random Video Call Socket.IO namespace
 setupRandomVideoSocket(io);
+
+// Setup Tunnel Socket.IO namespace
+console.log("[Server] Initializing tunnel socket...");
+const tunnelSocket = setupTunnelSocket(io);
+console.log("[Server] Tunnel socket initialized");
 
 // Debug endpoint to list all Socket.IO namespaces
 app.get("/debug/namespaces", (req, res) => {
@@ -293,6 +300,7 @@ app.use("/api/periods", periodRoutes);
 app.use("/api/collaborations", collaborationRoutes);
 app.use("/advertisements", advertisementsRoutes);
 app.use("/scheduled-posts", scheduledPostsRoutes);
+app.use("/api/tunnels", tunnelRoutes);
 // Health check endpoint
 app.get("/", (req, res) => {
   res.json({

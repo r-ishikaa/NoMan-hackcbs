@@ -13,15 +13,15 @@ const classroomMessages = new Map(); // classroomId -> Array of { username, mess
 
 // Available classrooms
 const CLASSROOMS = [
-  { id: 'classroom-1', name: 'Classroom 1 - Mathematics' },
-  { id: 'classroom-2', name: 'Classroom 2 - Science' },
-  { id: 'classroom-3', name: 'Classroom 3 - Literature' },
-  { id: 'classroom-4', name: 'Classroom 4 - History' },
-  { id: 'classroom-5', name: 'Classroom 5 - Arts' },
+  { id: "classroom-1", name: "Room 1 - Mathematics" },
+  { id: "classroom-2", name: "Room 2 - Science" },
+  { id: "classroom-3", name: "Room 3 - Literature" },
+  { id: "classroom-4", name: "Room 4 - History" },
+  { id: "classroom-5", name: "Room 5 - Arts" },
 ];
 
 // Initialize classroom maps
-CLASSROOMS.forEach(classroom => {
+CLASSROOMS.forEach((classroom) => {
   if (!classroomUsers.has(classroom.id)) {
     classroomUsers.set(classroom.id, new Map());
   }
@@ -40,9 +40,9 @@ export const setupVRSocket = (io) => {
 
   vrNamespace.on("connection", (socket) => {
     console.log(`[VR] Client connected: ${socket.id}`);
-    
+
     // Store current classroom for this socket
-    let currentClassroomId = null;
+    let currentRoomId = null;
     let userUsername = null;
     let userPosition = [0, 1, 0];
     let userRotation = [0, 0, 0];
@@ -59,33 +59,33 @@ export const setupVRSocket = (io) => {
       userUsername = username.trim();
 
       // Default to first classroom if no classroomId provided (single classroom mode)
-      const targetClassroomId = classroomId || CLASSROOMS[0].id;
-      const validClassroom = CLASSROOMS.find(c => c.id === targetClassroomId);
-      
-      if (!validClassroom) {
+      const targetRoomId = classroomId || CLASSROOMS[0].id;
+      const validRoom = CLASSROOMS.find((c) => c.id === targetRoomId);
+
+      if (!validRoom) {
         socket.emit("error", { message: "Invalid classroom ID" });
         return;
       }
 
       // Leave previous classroom if any
-      if (currentClassroomId && classroomUsers.has(currentClassroomId)) {
-        const prevClassroom = classroomUsers.get(currentClassroomId);
-        prevClassroom.delete(socket.id);
-        socket.leave(currentClassroomId);
-        
+      if (currentRoomId && classroomUsers.has(currentRoomId)) {
+        const prevRoom = classroomUsers.get(currentRoomId);
+        prevRoom.delete(socket.id);
+        socket.leave(currentRoomId);
+
         // Notify others in previous classroom
-        socket.to(currentClassroomId).emit("userLeft", {
+        socket.to(currentRoomId).emit("userLeft", {
           username: userUsername,
           socketId: socket.id,
-          classroomId: currentClassroomId,
+          classroomId: currentRoomId,
           timestamp: new Date().toISOString(),
         });
       }
 
       // Join classroom (default to first classroom)
-      currentClassroomId = targetClassroomId;
-      const classroomUsersMap = classroomUsers.get(targetClassroomId);
-      
+      currentRoomId = targetRoomId;
+      const classroomUsersMap = classroomUsers.get(targetRoomId);
+
       // Store user info in classroom
       classroomUsersMap.set(socket.id, {
         username: userUsername,
@@ -96,20 +96,20 @@ export const setupVRSocket = (io) => {
       });
 
       // Join socket room
-      socket.join(targetClassroomId);
+      socket.join(targetRoomId);
 
       // Notify the user they joined
       socket.emit("joined", {
         username: userUsername,
         socketId: socket.id,
-        classroomId: targetClassroomId,
+        classroomId: targetRoomId,
       });
 
       // Notify other users in the classroom about the new user
-      socket.to(targetClassroomId).emit("userJoined", {
+      socket.to(targetRoomId).emit("userJoined", {
         username: userUsername,
         socketId: socket.id,
-        classroomId: targetClassroomId,
+        classroomId: targetRoomId,
         position: userPosition,
         rotation: userRotation,
         timestamp: new Date().toISOString(),
@@ -126,47 +126,51 @@ export const setupVRSocket = (io) => {
       socket.emit("usersList", { users: usersList });
 
       // Send current whiteboard state to new user
-      const whiteboardState = classroomWhiteboards.get(targetClassroomId);
+      const whiteboardState = classroomWhiteboards.get(targetRoomId);
       if (whiteboardState) {
         socket.emit("whiteboardUpdate", whiteboardState);
       }
 
       // Send chat history to new user
-      const messages = classroomMessages.get(targetClassroomId) || [];
+      const messages = classroomMessages.get(targetRoomId) || [];
       socket.emit("chatHistory", { messages });
 
-      console.log(`[VR] User ${userUsername} joined classroom ${targetClassroomId} (${socket.id})`);
-      console.log(`[VR] Total users in ${targetClassroomId}: ${classroomUsersMap.size}`);
+      console.log(
+        `[VR] User ${userUsername} joined classroom ${targetRoomId} (${socket.id})`
+      );
+      console.log(
+        `[VR] Total users in ${targetRoomId}: ${classroomUsersMap.size}`
+      );
     });
 
     // Handle classroom change (position-based)
     socket.on("classroomChange", (data) => {
-      const { username, previousClassroomId, newClassroomId, position, rotation } = data;
+      const { username, previousRoomId, newRoomId, position, rotation } = data;
 
       userPosition = position || userPosition;
       userRotation = rotation || userRotation;
 
       // Leave previous classroom
-      if (previousClassroomId && classroomUsers.has(previousClassroomId)) {
-        const prevClassroom = classroomUsers.get(previousClassroomId);
-        prevClassroom.delete(socket.id);
-        socket.leave(previousClassroomId);
-        
-        socket.to(previousClassroomId).emit("userLeft", {
+      if (previousRoomId && classroomUsers.has(previousRoomId)) {
+        const prevRoom = classroomUsers.get(previousRoomId);
+        prevRoom.delete(socket.id);
+        socket.leave(previousRoomId);
+
+        socket.to(previousRoomId).emit("userLeft", {
           username: username || userUsername,
           socketId: socket.id,
-          classroomId: previousClassroomId,
+          classroomId: previousRoomId,
           timestamp: new Date().toISOString(),
         });
       }
 
       // Join new classroom
-      if (newClassroomId) {
-        const validClassroom = CLASSROOMS.find(c => c.id === newClassroomId);
-        if (validClassroom) {
-          currentClassroomId = newClassroomId;
-          const classroomUsersMap = classroomUsers.get(newClassroomId);
-          
+      if (newRoomId) {
+        const validRoom = CLASSROOMS.find((c) => c.id === newRoomId);
+        if (validRoom) {
+          currentRoomId = newRoomId;
+          const classroomUsersMap = classroomUsers.get(newRoomId);
+
           classroomUsersMap.set(socket.id, {
             username: username || userUsername,
             socket: socket,
@@ -175,36 +179,36 @@ export const setupVRSocket = (io) => {
             rotation: userRotation,
           });
 
-          socket.join(newClassroomId);
+          socket.join(newRoomId);
 
           // Send list of users in new classroom
-          const usersInClassroom = Array.from(classroomUsersMap.values())
-            .filter(user => user.socket.id !== socket.id)
-            .map(user => ({
+          const usersInRoom = Array.from(classroomUsersMap.values())
+            .filter((user) => user.socket.id !== socket.id)
+            .map((user) => ({
               username: user.username,
               socketId: user.socket.id,
-              classroomId: newClassroomId,
+              classroomId: newRoomId,
             }));
 
           socket.emit("usersList", {
-            users: usersInClassroom,
-            classroomId: newClassroomId,
+            users: usersInRoom,
+            classroomId: newRoomId,
           });
 
           // Send whiteboard state
-          const whiteboardState = classroomWhiteboards.get(newClassroomId);
+          const whiteboardState = classroomWhiteboards.get(newRoomId);
           if (whiteboardState) {
             socket.emit("whiteboardUpdate", {
               ...whiteboardState,
-              classroomId: newClassroomId,
+              classroomId: newRoomId,
             });
           }
 
           // Notify others in new classroom
-          socket.to(newClassroomId).emit("userJoined", {
+          socket.to(newRoomId).emit("userJoined", {
             username: username || userUsername,
             socketId: socket.id,
-            classroomId: newClassroomId,
+            classroomId: newRoomId,
             position: userPosition,
             rotation: userRotation,
             timestamp: new Date().toISOString(),
@@ -212,18 +216,18 @@ export const setupVRSocket = (io) => {
         }
       } else {
         // Left all classrooms
-        currentClassroomId = null;
+        currentRoomId = null;
       }
     });
 
     // Handle voice audio data
     socket.on("voice", (data) => {
-      if (!currentClassroomId) {
+      if (!currentRoomId) {
         socket.emit("error", { message: "You must join a classroom first" });
         return;
       }
-      
-      const classroomUsersMap = classroomUsers.get(currentClassroomId);
+
+      const classroomUsersMap = classroomUsers.get(currentRoomId);
       const user = classroomUsersMap.get(socket.id);
       if (!user) {
         socket.emit("error", { message: "You must join first" });
@@ -231,7 +235,7 @@ export const setupVRSocket = (io) => {
       }
 
       // Broadcast audio to all other users in the same classroom
-      socket.to(currentClassroomId).emit("voice", {
+      socket.to(currentRoomId).emit("voice", {
         socketId: socket.id,
         username: user.username,
         audioData: data.audioData,
@@ -241,13 +245,13 @@ export const setupVRSocket = (io) => {
 
     // Handle voice stream start
     socket.on("voiceStart", () => {
-      if (!currentClassroomId) return;
-      
-      const classroomUsersMap = classroomUsers.get(currentClassroomId);
+      if (!currentRoomId) return;
+
+      const classroomUsersMap = classroomUsers.get(currentRoomId);
       const user = classroomUsersMap.get(socket.id);
       if (!user) return;
 
-      socket.to(currentClassroomId).emit("userVoiceStart", {
+      socket.to(currentRoomId).emit("userVoiceStart", {
         socketId: socket.id,
         username: user.username,
         timestamp: new Date().toISOString(),
@@ -256,13 +260,13 @@ export const setupVRSocket = (io) => {
 
     // Handle voice stream end
     socket.on("voiceEnd", () => {
-      if (!currentClassroomId) return;
-      
-      const classroomUsersMap = classroomUsers.get(currentClassroomId);
+      if (!currentRoomId) return;
+
+      const classroomUsersMap = classroomUsers.get(currentRoomId);
       const user = classroomUsersMap.get(socket.id);
       if (!user) return;
 
-      socket.to(currentClassroomId).emit("userVoiceEnd", {
+      socket.to(currentRoomId).emit("userVoiceEnd", {
         socketId: socket.id,
         username: user.username,
         timestamp: new Date().toISOString(),
@@ -272,13 +276,13 @@ export const setupVRSocket = (io) => {
     // Handle user position update (broadcast to all users in classroom)
     socket.on("positionUpdate", (data) => {
       const { position, rotation } = data;
-      
+
       userPosition = position || userPosition;
       userRotation = rotation || userRotation;
 
       // Update user position in classroom
-      if (currentClassroomId && classroomUsers.has(currentClassroomId)) {
-        const classroomUsersMap = classroomUsers.get(currentClassroomId);
+      if (currentRoomId && classroomUsers.has(currentRoomId)) {
+        const classroomUsersMap = classroomUsers.get(currentRoomId);
         const user = classroomUsersMap.get(socket.id);
         if (user) {
           user.position = userPosition;
@@ -286,7 +290,7 @@ export const setupVRSocket = (io) => {
         }
 
         // Broadcast position update to others in the same classroom
-        socket.to(currentClassroomId).emit("userPositionUpdate", {
+        socket.to(currentRoomId).emit("userPositionUpdate", {
           socketId: socket.id,
           username: userUsername || "Unknown",
           position: userPosition,
@@ -297,12 +301,12 @@ export const setupVRSocket = (io) => {
 
     // Handle whiteboard image upload
     socket.on("whiteboardImage", (data) => {
-      if (!currentClassroomId) {
+      if (!currentRoomId) {
         socket.emit("error", { message: "You must join a classroom first" });
         return;
       }
-      
-      const classroomUsersMap = classroomUsers.get(currentClassroomId);
+
+      const classroomUsersMap = classroomUsers.get(currentRoomId);
       const user = classroomUsersMap?.get(socket.id);
       if (!user) {
         socket.emit("error", { message: "You must join first" });
@@ -316,25 +320,27 @@ export const setupVRSocket = (io) => {
         socketId: socket.id,
         timestamp: new Date().toISOString(),
       };
-      
-      classroomWhiteboards.set(currentClassroomId, whiteboardState);
+
+      classroomWhiteboards.set(currentRoomId, whiteboardState);
 
       // Broadcast whiteboard image to all users in this classroom (including sender for sync)
-      vrNamespace.to(currentClassroomId).emit("whiteboardUpdate", whiteboardState);
+      vrNamespace.to(currentRoomId).emit("whiteboardUpdate", whiteboardState);
       // Also send to sender to ensure sync
       socket.emit("whiteboardUpdate", whiteboardState);
 
-      console.log(`[VR] Whiteboard updated by ${user.username} in ${currentClassroomId}`);
+      console.log(
+        `[VR] Whiteboard updated by ${user.username} in ${currentRoomId}`
+      );
     });
 
     // Handle chat message
     socket.on("chatMessage", (data) => {
-      if (!currentClassroomId) {
+      if (!currentRoomId) {
         socket.emit("error", { message: "You must join a classroom first" });
         return;
       }
-      
-      const classroomUsersMap = classroomUsers.get(currentClassroomId);
+
+      const classroomUsersMap = classroomUsers.get(currentRoomId);
       const user = classroomUsersMap?.get(socket.id);
       if (!user) {
         socket.emit("error", { message: "You must join first" });
@@ -348,45 +354,51 @@ export const setupVRSocket = (io) => {
       };
 
       // Store message in classroom history (keep last 100 messages)
-      const messages = classroomMessages.get(currentClassroomId) || [];
+      const messages = classroomMessages.get(currentRoomId) || [];
       messages.push(messageData);
       if (messages.length > 100) {
         messages.shift(); // Remove oldest message if over limit
       }
-      classroomMessages.set(currentClassroomId, messages);
+      classroomMessages.set(currentRoomId, messages);
 
       // Broadcast message to all users in this classroom
-      vrNamespace.to(currentClassroomId).emit("chatMessage", messageData);
+      vrNamespace.to(currentRoomId).emit("chatMessage", messageData);
 
-      console.log(`[VR] Chat message from ${user.username} in ${currentClassroomId}: ${data.message}`);
+      console.log(
+        `[VR] Chat message from ${user.username} in ${currentRoomId}: ${data.message}`
+      );
     });
 
     // Handle disconnect
     socket.on("disconnect", (reason) => {
-      if (currentClassroomId && classroomUsers.has(currentClassroomId)) {
-        const classroomUsersMap = classroomUsers.get(currentClassroomId);
+      if (currentRoomId && classroomUsers.has(currentRoomId)) {
+        const classroomUsersMap = classroomUsers.get(currentRoomId);
         const user = classroomUsersMap.get(socket.id);
-        
+
         if (user) {
           const username = user.username;
           classroomUsersMap.delete(socket.id);
 
           // Notify other users in the classroom
-          socket.to(currentClassroomId).emit("userLeft", {
+          socket.to(currentRoomId).emit("userLeft", {
             username: username,
             socketId: socket.id,
-            classroomId: currentClassroomId,
+            classroomId: currentRoomId,
             timestamp: new Date().toISOString(),
           });
 
           console.log(
-            `[VR] User left: ${username} from ${currentClassroomId} (${socket.id}) - Reason: ${reason}`
+            `[VR] User left: ${username} from ${currentRoomId} (${socket.id}) - Reason: ${reason}`
           );
-          console.log(`[VR] Total users in ${currentClassroomId}: ${classroomUsersMap.size}`);
+          console.log(
+            `[VR] Total users in ${currentRoomId}: ${classroomUsersMap.size}`
+          );
         }
       } else {
         console.log(
-          `[VR] Client disconnected: ${socket.id} (${userUsername || 'unknown'}) - Reason: ${reason}`
+          `[VR] Client disconnected: ${socket.id} (${
+            userUsername || "unknown"
+          }) - Reason: ${reason}`
         );
       }
     });
@@ -403,7 +415,7 @@ export const setupVRSocket = (io) => {
 
 // REST endpoint to get available classrooms
 router.get("/classrooms", (req, res) => {
-  const classroomsInfo = CLASSROOMS.map(classroom => {
+  const classroomsInfo = CLASSROOMS.map((classroom) => {
     const usersCount = classroomUsers.get(classroom.id)?.size || 0;
     return {
       id: classroom.id,
@@ -422,7 +434,7 @@ router.get("/classrooms", (req, res) => {
 // REST endpoint to get VR room info
 router.get("/", (req, res) => {
   const classroomId = req.query.classroomId;
-  
+
   if (classroomId && classroomUsers.has(classroomId)) {
     const classroomUsersMap = classroomUsers.get(classroomId);
     const usersCount = classroomUsersMap.size;
@@ -443,7 +455,7 @@ router.get("/", (req, res) => {
     res.json({
       status: "ok",
       message: "VR room endpoint",
-      classrooms: CLASSROOMS.map(c => ({
+      classrooms: CLASSROOMS.map((c) => ({
         id: c.id,
         name: c.name,
         usersCount: classroomUsers.get(c.id)?.size || 0,
@@ -456,14 +468,14 @@ router.get("/", (req, res) => {
 // REST endpoint to get connected users list for a classroom
 router.get("/users", (req, res) => {
   const classroomId = req.query.classroomId;
-  
+
   if (!classroomId || !classroomUsers.has(classroomId)) {
     return res.status(400).json({
       status: "error",
-      message: "Classroom ID is required",
+      message: "Room ID is required",
     });
   }
-  
+
   const classroomUsersMap = classroomUsers.get(classroomId);
   const users = Array.from(classroomUsersMap.values()).map((u) => ({
     username: u.username,
