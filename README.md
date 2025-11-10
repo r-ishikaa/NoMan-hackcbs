@@ -46,7 +46,8 @@ The platform combines modern web technologies with real-time communication featu
 
 ---
 ## landng page
-🎥 [video]([https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://youtu.be/dzkJAn2q2lQ))
+🎥 [Video](https://youtu.be/dzkJAn2q2lQ)
+
 
 
 ## ✨ Features
