@@ -22,21 +22,7 @@
 
 ---
 
-## 📋 Table of Contents
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Configuration](#-configuration)
-- [API Documentation](#-api-documentation)
-- [Key Features Deep Dive](#-key-features-deep-dive)
-- [Implementation](#-implementation)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
-
----
 
 ## 🎯 Overview
 
@@ -46,7 +32,8 @@ The platform combines modern web technologies with real-time communication featu
 
 ---
 ## landng page
-🎥 [Video]([https://youtu.be/dzkJAn2q2lQ](https://youtu.be/RsL7K0zdAJQ))
+🎥 [Video](https://youtu.be/dzkJAn2q2lQ)
+
 
 
 
