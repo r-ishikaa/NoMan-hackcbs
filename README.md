@@ -40,11 +40,14 @@
 
 ## 🎯 Overview
 
-Hexagon is a comprehensive platform designed to empower women by creating meaningful connections, sharing authentic stories, and building supportive communities. More than just a social feed, Hexagon provides a space for women to grow, learn, and inspire together through educational courses, creative reels, supportive communities, shared challenges, and immersive virtual experiences.
+Noman is a comprehensive platform designed to empower women by creating meaningful connections, sharing authentic stories, and building supportive communities. More than just a social feed, Noman provides a space for women to grow, and post creative reels, period tracking , networking , creating communities.
 
 The platform combines modern web technologies with real-time communication features, virtual reality classrooms, and AI-powered content creation tools to create an engaging and empowering experience.
 
 ---
+## landng page
+🎥 [video]([https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://youtu.be/dzkJAn2q2lQ))
+
 
 ## ✨ Features
 
@@ -54,7 +57,7 @@ The platform combines modern web technologies with real-time communication featu
 - **JWT-based Sessions**: Secure token-based authentication with refresh tokens
 - **User Profiles**: Customizable profiles with display names, bio, avatars, and resume uploads
 - **Public Profiles**: Shareable profile pages for networking and discovery
-- **Role-based Access**: Student and creator roles with different permissions
+- **Role-based Access**:creater user enterprise roles with different permissions
 - **Profile Editing**: Update profile information, preferences, and settings
 
 
@@ -63,11 +66,11 @@ The platform combines modern web technologies with real-time communication featu
 - **Posts**: Create and share educational and inspirational posts
 - **Comments & Likes**: Engage with community content through comments and reactions
 - **Follow System**: Follow other users and build your network
-- **Reels Studio**: AI-powered educational reel script generation using Google Gemini
 - **Reels Feed**: Browse and interact with short-form educational content
 - **Reel Interactions**: Like, comment, and share reels
 - **Content Discovery**: Discover trending and relevant content
 - **Post Funding**: Support creators by funding posts through Stripe integration
+- **Time Capsule**- schedule post for future
 
 
 
@@ -140,9 +143,7 @@ The platform combines modern web technologies with real-time communication featu
 
 ### AI & External Services
 - **Google Gemini API**: AI-powered content generation
-- **OpenAI API**: Additional AI capabilities
-- **Groq SDK**: Fast AI inference
-- **Tavily Core**: Web search and research
+
 
 ### Development Tools
 - **Nodemon**: Development server auto-reload
@@ -424,291 +425,10 @@ NoMan-hackcbs/
 
 ---
 
-## 📡 API Documentation
 
-### Authentication Endpoints
 
-#### Register User
-```http
-POST /auth/signup
-Content-Type: application/json
 
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "displayName": "User Name",
-  "role": "student"
-}
-```
 
-#### Login
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-#### Google OAuth
-```http
-GET /auth/google/url?role=student
-```
-
-#### Refresh Token
-```http
-POST /auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "refresh_token_here"
-}
-```
-
-#### Logout
-```http
-POST /auth/logout
-Authorization: Bearer <token>
-```
-
-### User Endpoints
-
-#### Get Current User
-```http
-GET /users/me
-Authorization: Bearer <token>
-```
-
-#### Update User Profile
-```http
-PUT /users/me
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "displayName": "Updated Name",
-  "bio": "User bio",
-  "avatar": "avatar_url"
-}
-```
-
-#### Upload Resume
-```http
-POST /users/upload-resume
-Authorization: Bearer <token>
-Content-Type: multipart/form-data
-
-file: <resume_file>
-```
-
-### Course Endpoints
-
-#### Get All Courses
-```http
-GET /courses
-```
-
-#### Get Course by ID
-```http
-GET /courses/:id
-```
-
-#### Create Course
-```http
-POST /courses
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "title": "Course Title",
-  "description": "Course Description",
-  "category": "Technology",
-  "price": 99.99
-}
-```
-
-#### Enroll in Course
-```http
-POST /enrollments
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "courseId": "course_id_here"
-}
-```
-
-#### Get User Enrollments
-```http
-GET /enrollments/me
-Authorization: Bearer <token>
-```
-
-### Post Endpoints
-
-#### Get All Posts
-```http
-GET /posts
-```
-
-#### Create Post
-```http
-POST /posts
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "content": "Post content",
-  "images": ["image_url_1", "image_url_2"]
-}
-```
-
-#### Like/Unlike Post
-```http
-POST /posts/:id/like
-Authorization: Bearer <token>
-```
-
-#### Add Comment
-```http
-POST /posts/:id/comments
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "content": "Comment content"
-}
-```
-
-### Reel Endpoints
-
-#### Get All Reels
-```http
-GET /reels
-```
-
-#### Create Reel
-```http
-POST /reels
-Authorization: Bearer <token>
-Content-Type: multipart/form-data
-
-title: "Reel Title"
-description: "Reel Description"
-video: <video_file>
-```
-
-#### Generate Reel Script (AI)
-```http
-POST /reels/generate-script
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "topic": "Topic for reel",
-  "duration": 60
-}
-```
-
-### Community Endpoints
-
-#### Get All Communities
-```http
-GET /communities
-```
-
-#### Create Community
-```http
-POST /communities
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Community Name",
-  "description": "Community Description",
-  "category": "Technology"
-}
-```
-
-#### Join Community
-```http
-POST /communities/:id/join
-Authorization: Bearer <token>
-```
-
-### Payment Endpoints
-
-#### Create Payment Intent
-```http
-POST /payments/create-intent
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "postId": "post_id_here",
-  "amount": 10.00,
-  "message": "Support message"
-}
-```
-
-#### Confirm Payment
-```http
-POST /payments/confirm
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "paymentIntentId": "payment_intent_id",
-  "postId": "post_id_here"
-}
-```
-
-#### Get Funding Stats
-```http
-GET /payments/post/:postId
-```
-
-### VR Endpoints
-
-#### Get VR Room Info
-```http
-GET /vr
-```
-
-#### Get Users in VR Room
-```http
-GET /vr/users
-```
-
-#### Get Classrooms
-```http
-GET /vr/classrooms
-```
-
-### Analytics Endpoints
-
-#### Get User Analytics
-```http
-GET /analytics/me
-Authorization: Bearer <token>
-```
-
-#### Get Activity Heatmap
-```http
-GET /analytics/activity-heatmap
-Authorization: Bearer <token>
-```
-
-### Socket.IO Events
-
-#### VR Namespace (`/vr`)
-- `join-room`: Join a VR room
-- `leave-room`: Leave a VR room
-- `update-position`: Update avatar position
-- `send-message`: Send chat message
-- `upload-whiteboard`: Upload whiteboard image
 
 #### Notifications Namespace (`/notifications`)
 - `subscribe`: Subscribe to notifications
@@ -725,21 +445,8 @@ Authorization: Bearer <token>
 
 ## 🔍 Key Features Deep Dive
 
-### VR Classroom Architecture
 
-The VR classroom uses React Three Fiber for 3D rendering and Socket.IO for real-time communication:
 
-- **3D Environment**: Custom-built school with multiple classrooms using Three.js
-- **Avatar System**: Each user gets a 3D avatar with position tracking
-- **Voice Chat**: Web Audio API for real-time voice communication
-- **Whiteboard**: Synchronized image sharing across all users in a room
-- **Group Chat**: Text messaging within classrooms
-- **Position-based Joining**: Users automatically join/leave meetings based on avatar position
-- **Multi-classroom Support**: Independent meetings for each classroom
-
-### AI-Powered Reel Generation
-
-The Reels Studio uses Google Gemini API to generate educational reel scripts:
 
 - **Topic-based Generation**: Input a topic and get a structured script
 - **Duration Control**: Specify reel duration (30s, 60s, 90s)
@@ -797,221 +504,27 @@ Community-based features for group interactions:
 ## 🎨 Implementation
 
 <!-- Add implementation images here -->
-<!-- 
+
 ### Screenshots
+![WhatsApp Image 2025-11-09 at 10 26 51 (1)](https://github.com/user-attachments/assets/4d18ca0e-8ccd-456b-ba56-8af0aa8681cf)
 
-#### Landing Page
-![Landing Page](screenshots/landing-page.png)
 
-#### Dashboard
-![Dashboard](screenshots/dashboard.png)
 
-#### VR Classroom
-![VR Classroom](screenshots/vr-classroom.png)
+![WhatsApp Image 2025-11-09 at 08 47 22 (1)](https://github.com/user-attachments/assets/46f68ff9-4034-4852-ad41-7fc8ee6f9751)
 
-#### Course Page
-![Course Page](screenshots/course-page.png)
+![WhatsApp Image 2025-11-09 at 10 12 16 (1)](https://github.com/user-attachments/assets/14562d30-3472-40f7-99c2-eda18f924790)
+![WhatsApp Image 2025-11-09 at 08 50 33 (1)](https://github.com/user-attachments/assets/0a6d5005-e7cf-4ab5-b640-889dd3421cd5)
 
-#### Reels Feed
-![Reels Feed](screenshots/reels-feed.png)
 
-#### Community Page
-![Community Page](screenshots/community-page.png)
--->
+####<img width="1440" height="785" alt="Screenshot 2025-11-09 at 8 41 46 AM" src="https://github.com/user-attachments/assets/54257b1b-2483-4f99-94a3-6aba685dffa7" />
 
-### Implementation Details
+![WhatsApp Image 2025-11-09 at 10 17 52 (1)](https://github.com/user-attachments/assets/7ec35ad9-fff9-4f01-af34-7ca99e4c81aa)
+![WhatsApp Image 2025-11-09 at 08 50 44 (1)](https://github.com/user-attachments/assets/2da794c3-d20c-4dd5-a85b-51ca34340d15)
 
-<!-- Add implementation details, architecture diagrams, flowcharts, etc. here -->
 
----
 
-## 🚀 Deployment
 
-### Backend Deployment (Vercel)
 
-1. **Install Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
-
-2. **Deploy Backend**
-   ```bash
-   cd backend
-   vercel
-   ```
-
-3. **Set Environment Variables**
-   - Go to Vercel Dashboard
-   - Navigate to your project settings
-   - Add all environment variables from `.env`
-
-4. **Configure Vercel**
-   - Set build command: `npm run vercel-build`
-   - Set output directory: `.`
-   - Set install command: `npm install`
-
-### Frontend Deployment (Vercel)
-
-1. **Deploy Frontend**
-   ```bash
-   cd frontend
-   vercel
-   ```
-
-2. **Set Environment Variables**
-   - Add `VITE_API_URL` with your backend URL
-   - Add `VITE_STRIPE_PUBLIC_KEY` if using Stripe
-
-3. **Configure Vercel**
-   - Set build command: `npm run build`
-   - Set output directory: `dist`
-   - Set install command: `npm install`
-
-### Database Deployment (MongoDB Atlas)
-
-1. **Create MongoDB Atlas Account**
-   - Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-   - Create a free cluster
-
-2. **Configure Database**
-   - Create a database user
-   - Whitelist IP addresses (or allow all for development)
-   - Get connection string
-
-3. **Update Environment Variables**
-   - Set `MONGO_URL` with your Atlas connection string
-
-### Redis Deployment (Redis Cloud)
-
-1. **Create Redis Cloud Account**
-   - Go to [Redis Cloud](https://redis.com/try-free/)
-   - Create a free database
-
-2. **Configure Redis**
-   - Get connection URL
-   - Update `REDIS_URL` in environment variables
-
-### Environment Variables for Production
-
-Make sure to set all required environment variables in your deployment platform:
-
-- Database URLs
-- Authentication secrets
-- API keys
-- Service URLs
-- Stripe keys
-- VAPID keys
-
----
-
-## 🤝 Contributing
-
-We welcome contributions to Hexagon! Here's how you can help:
-
-### How to Contribute
-
-1. **Fork the Repository**
-   - Click the "Fork" button on GitHub
-   - Clone your forked repository
-
-2. **Create a Feature Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-3. **Make Your Changes**
-   - Write clean, readable code
-   - Follow existing code style
-   - Add comments where necessary
-   - Update documentation if needed
-
-4. **Test Your Changes**
-   - Test locally before submitting
-   - Ensure all tests pass
-   - Test edge cases
-
-5. **Commit Your Changes**
-   ```bash
-   git commit -m "Add: Description of your changes"
-   ```
-   Use conventional commit messages:
-   - `Add:` for new features
-   - `Fix:` for bug fixes
-   - `Update:` for updates to existing features
-   - `Remove:` for removing features
-   - `Docs:` for documentation changes
-
-6. **Push to Your Fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-7. **Create a Pull Request**
-   - Go to the original repository on GitHub
-   - Click "New Pull Request"
-   - Select your branch
-   - Describe your changes
-   - Submit the pull request
-
-### Code Style Guidelines
-
-- **JavaScript/React**: Follow ESLint configuration
-- **Naming**: Use camelCase for variables and functions, PascalCase for components
-- **Comments**: Add comments for complex logic
-- **Documentation**: Update README and code comments when adding features
-
-### Reporting Issues
-
-If you find a bug or have a suggestion:
-
-1. **Check Existing Issues**: Make sure the issue hasn't been reported
-2. **Create an Issue**: 
-   - Use a descriptive title
-   - Provide detailed description
-   - Include steps to reproduce (for bugs)
-   - Add screenshots if applicable
-
-### Feature Requests
-
-We welcome feature requests! Please:
-
-1. **Check Existing Requests**: Make sure it hasn't been requested
-2. **Create an Issue**: 
-   - Use "Feature Request" label
-   - Describe the feature clearly
-   - Explain the use case
-   - Suggest implementation if possible
-
----
-
-## 📄 License
-
-This project is licensed under the ISC License.
-
----
-
-## 👥 Team
-
-<!-- Add team members and contributors here -->
-
----
-
-## 🙏 Acknowledgments
-
-- React community for excellent documentation
-- MongoDB for database solutions
-- Vercel for deployment platform
-- Stripe for payment processing
-- Google for AI services
-- All contributors and supporters
-
----
-
-## 📞 Support
-
-For support, please open an issue on GitHub or contact the development team.
-
----
 
 <div align="center">
 
